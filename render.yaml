@@ -1,0 +1,18 @@
+services:
+  - type: web
+    name: motoshop
+    runtime: python
+    plan: starter
+    region: frankfurt # closer to Tanzania than the default (oregon); change if you prefer
+    buildCommand: "cd frontend && npm install && npm run build && cd ../backend && pip install -r requirements.txt"
+    startCommand: "cd backend && gunicorn -w 1 --threads 4 -b 0.0.0.0:$PORT app:app"
+    healthCheckPath: /api/health
+    envVars:
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DB_PATH
+        value: /var/data/motoshop.db
+    disk:
+      name: motoshop-data
+      mountPath: /var/data
+      sizeGB: 1
