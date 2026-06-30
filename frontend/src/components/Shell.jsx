@@ -15,7 +15,7 @@ import ProfilePage from '../pages/ProfilePage'
 import StockPage from '../pages/StockPage'
 
 export default function Shell() {
-  const { auth, activeTab, setActiveTab, sseConnected, logout, settings, isOnline, pendingSyncCount } = useApp()
+  const { auth, activeTab, setActiveTab, sseConnected, logout, settings, isOnline, pendingSyncCount, theme, toggleTheme } = useApp()
   const T = useT()
   const [sidebarOpen, setSidebarOpen] = useState(false)
 
@@ -88,6 +88,15 @@ export default function Shell() {
               <span className={`sse-dot ${sseConnected ? '' : 'offline'}`} />
               {sseConnected ? T('live') : '—'}
             </span>
+            <button
+              className="btn btn-ghost btn-icon"
+              onClick={toggleTheme}
+              aria-label={theme === 'light' ? T('theme_switch_dark') : T('theme_switch_light')}
+              title={theme === 'light' ? T('theme_switch_dark') : T('theme_switch_light')}
+              style={{fontSize:16}}
+            >
+              {theme === 'light' ? '🌙' : '☀️'}
+            </button>
             <button className="btn btn-ghost btn-sm" onClick={logout} style={{fontSize:12}}>{T('logout')}</button>
           </div>
         </div>

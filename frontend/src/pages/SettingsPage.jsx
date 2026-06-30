@@ -12,6 +12,9 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false)
   const [cashierStatus, setCashierStatus] = useState(null)
   const [cashierId, setCashierId] = useState(null)
+  const [cashierActiveUntil, setCashierActiveUntil] = useState(null)
+  const [accessMode, setAccessMode] = useState('permanent') // 'permanent' | 'days'
+  const [accessDays, setAccessDays] = useState(1)
   const [resetPwModal, setResetPwModal] = useState(false)
   const [newCashierPw, setNewCashierPw] = useState('')
   const [catModal, setCatModal] = useState(false)
@@ -31,7 +34,11 @@ export default function SettingsPage() {
       header_icon: settings.header_icon || '🏍️',
       logo_image: settings.logo_image || '',
     })
-    api.getCashierStatus().then(d => { setCashierStatus(d.is_active); if (d.id) setCashierId(d.id) }).catch(() => {})
+    api.getCashierStatus().then(d => {
+      setCashierStatus(d.is_active)
+      if (d.id) setCashierId(d.id)
+      setCashierActiveUntil(d.active_until || null)
+    }).catch(() => {})
   }, [settings])
 
   async function save() {
@@ -48,9 +55,25 @@ export default function SettingsPage() {
 
   async function toggleCashier() {
     try {
-      const result = await api.setCashierStatus(!cashierStatus)
-      setCashierStatus(result.is_active)
-      toast(`Akaunti ya mkashia ${result.is_active ? 'imewezeshwa' : 'imezimwa'}`, 'success')
+      if (cashierStatus) {
+        // Disabling — no days needed.
+        const result = await api.setCashierStatus(false)
+        setCashierStatus(result.is_active)
+        setCashierActiveUntil(null)
+        toast('Akaunti ya mkashia imezimwa', 'success')
+      } else {
+        // Enabling — respect the chosen access mode.
+        const days = accessMode === 'days' ? accessDays : null
+        const result = await api.setCashierStatus(true, days)
+        setCashierStatus(result.is_active)
+        setCashierActiveUntil(result.active_until || null)
+        toast(
+          result.active_until
+            ? `Akaunti imewezeshwa kwa siku ${accessDays}`
+            : 'Akaunti imewezeshwa permanently',
+          'success'
+        )
+      }
     } catch(err) { toast(err.message || T('settings_cashier_toggle_failed'), 'error') }
   }
 
@@ -225,12 +248,51 @@ export default function SettingsPage() {
               <div style={{fontWeight:600}}>Hali ya Akaunti ya Mkashia</div>
               <div style={{fontSize:12,color:'var(--text3)',marginTop:2}}>
                 {cashierStatus ? T('settings_cashier_enabled') : T('settings_cashier_disabled')}
+                {cashierStatus && cashierActiveUntil && (
+                  <span> · Itazimika: {new Date(cashierActiveUntil).toLocaleString('sw-TZ', {day:'2-digit',month:'short',hour:'2-digit',minute:'2-digit'})}</span>
+                )}
+                {cashierStatus && !cashierActiveUntil && (
+                  <span> · Permanent</span>
+                )}
               </div>
             </div>
             <button className={`btn btn-sm ${cashierStatus ? 'btn-danger' : 'btn-success'}`} onClick={toggleCashier}>
               {cashierStatus ? 'Zima' : 'Wezesha'}
             </button>
           </div>
+
+          {!cashierStatus && (
+            <div style={{padding:'4px 0 12px',borderBottom:'1px solid var(--border)'}}>
+              <div style={{fontSize:12,fontWeight:600,color:'var(--text2)',marginBottom:8}}>Aina ya Ufikiaji Ukiwezesha</div>
+              <div className="flex gap-2" style={{marginBottom: accessMode === 'days' ? 10 : 0, flexWrap:'wrap'}}>
+                <button
+                  className={`btn btn-sm ${accessMode === 'permanent' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setAccessMode('permanent')}
+                >Permanent</button>
+                <button
+                  className={`btn btn-sm ${accessMode === 'days' ? 'btn-primary' : 'btn-secondary'}`}
+                  onClick={() => setAccessMode('days')}
+                >Idadi ya Siku</button>
+              </div>
+              {accessMode === 'days' && (
+                <div className="input-group" style={{maxWidth:160}}>
+                  <label className="input-label text-xs">Siku ngapi?</label>
+                  <input
+                    className="input input-sm"
+                    type="number"
+                    min="1"
+                    max="365"
+                    value={accessDays}
+                    onChange={e => setAccessDays(Math.max(1, Math.min(365, Number(e.target.value) || 1)))}
+                  />
+                  <span style={{fontSize:11,color:'var(--text3)',marginTop:4}}>
+                    Akaunti itajizima yenyewe baada ya siku {accessDays} — owner hatahitaji kuwezesha kila siku.
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
+
           <div className="flex items-center justify-between" style={{padding:'12px 0'}}>
             <div>
               <div style={{fontWeight:600}}>Badilisha Nywila ya Mkashia</div>

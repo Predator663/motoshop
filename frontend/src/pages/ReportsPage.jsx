@@ -108,6 +108,7 @@ export default function ReportsPage() {
 
 // ── P&L ──────────────────────────────────────────────────────────────────
 function PLReport({ data, currency }) {
+  const T = useT()
   const isProfit = data.net_profit >= 0
   return (
     <div>
@@ -117,16 +118,16 @@ function PLReport({ data, currency }) {
       </div>
 
       <div className="report-kpi-grid">
-        <KPI label="Total T('reports_revenue')" value={formatMoney(data.revenue, currency)} color="var(--amber)" />
+        <KPI label={`Total ${T('reports_revenue')}`} value={formatMoney(data.revenue, currency)} color="var(--amber)" />
         <KPI label="Cost of Goods" value={formatMoney(data.cogs, currency)} color="var(--red)" />
-        <KPI label="T('reports_gross')" value={formatMoney(data.gross_profit, currency)} color="var(--green)" />
-        <KPI label="T('reports_expenses')" value={formatMoney(data.total_expenses, currency)} color="var(--red)" />
-        <KPI label="T('reports_net')" value={formatMoney(data.net_profit, currency)} color={isProfit?'var(--green)':'var(--red)'} large />
+        <KPI label={T('reports_gross')} value={formatMoney(data.gross_profit, currency)} color="var(--green)" />
+        <KPI label={T('reports_expenses')} value={formatMoney(data.total_expenses, currency)} color="var(--red)" />
+        <KPI label={T('reports_net')} value={formatMoney(data.net_profit, currency)} color={isProfit?'var(--green)':'var(--red)'} large />
       </div>
 
       <div className="report-section">
-        <div className="report-section-header">T('reports_revenue')</div>
-        <div className="pl-row"><span>Sales T('reports_revenue')</span><span style={{color:'var(--amber)',fontWeight:700}}>{formatMoney(data.revenue, currency)}</span></div>
+        <div className="report-section-header">{T('reports_revenue')}</div>
+        <div className="pl-row"><span>Sales {T('reports_revenue')}</span><span style={{color:'var(--amber)',fontWeight:700}}>{formatMoney(data.revenue, currency)}</span></div>
         <div className="pl-row" style={{color:'var(--red)'}}><span>Less: Cost of Goods Sold</span><span>({formatMoney(data.cogs, currency)})</span></div>
         <div className="pl-row total profit" style={{background:'rgba(34,197,94,.1)',color:'var(--green)'}}>
           <span>GROSS PROFIT</span><span>{formatMoney(data.gross_profit, currency)}</span>
@@ -141,13 +142,13 @@ function PLReport({ data, currency }) {
             <span style={{color:'var(--red)'}}>({formatMoney(e.total, currency)})</span>
           </div>
         ))}
-        <div className="pl-row total" style={{color:'var(--red)'}}><span>T('reports_expenses')</span><span>({formatMoney(data.total_expenses, currency)})</span></div>
+        <div className="pl-row total" style={{color:'var(--red)'}}><span>{T('reports_expenses')}</span><span>({formatMoney(data.total_expenses, currency)})</span></div>
       </div>
 
       <div className="report-section">
         <div className={`pl-row grand`} style={{
           background: isProfit ? 'var(--green2)' : 'var(--red2)',
-          color:'#fff', padding:'18px 16px', fontSize:20, fontWeight:800
+          color:'var(--on-accent)', padding:'18px 16px', fontSize:20, fontWeight:800
         }}>
           <span>{isProfit ? '✅ NET PROFIT' : '❌ NET LOSS'}</span>
           <span>{formatMoney(Math.abs(data.net_profit), currency)}</span>
@@ -224,6 +225,7 @@ function StockReport({ data, currency }) {
 
 // ── Sales statement ───────────────────────────────────────────────────────
 function SalesReport({ data, currency }) {
+  const T = useT()
   return (
     <div>
       <div className="report-header">
@@ -232,7 +234,7 @@ function SalesReport({ data, currency }) {
       </div>
 
       <div className="report-kpi-grid">
-        <KPI label="Total T('reports_revenue')" value={formatMoney(data.total, currency)} color="var(--amber)" large />
+        <KPI label={`Total ${T('reports_revenue')}`} value={formatMoney(data.total, currency)} color="var(--amber)" large />
         <KPI label="Transactions" value={data.sales.length} color="var(--teal)" />
         <KPI label="Avg Sale" value={formatMoney(data.sales.length ? data.total / data.sales.length : 0, currency)} color="var(--text2)" />
         {Object.entries(data.by_method).map(([m, v]) => (

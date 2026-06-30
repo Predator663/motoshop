@@ -292,7 +292,8 @@ def init_db():
             qty REAL NOT NULL,
             unit_price REAL NOT NULL,
             discount_pct REAL NOT NULL DEFAULT 0,
-            line_total REAL NOT NULL
+            line_total REAL NOT NULL,
+            buying_price_at_sale REAL NOT NULL DEFAULT 0
         );
 
         CREATE TABLE IF NOT EXISTS debts (
@@ -365,6 +366,25 @@ def init_db():
         db.execute("INSERT OR IGNORE INTO categories (name) VALUES (?)", (c,))
 
     db.commit()
+
+    # ── Schema migrations (run on every startup, safe via try/except) ──
+    # Migration 001: store buying price at time of sale so COGS is always
+    # historically accurate even if buying_price is later edited on a product.
+    migrations = [
+        "ALTER TABLE sale_items ADD COLUMN buying_price_at_sale REAL NOT NULL DEFAULT 0",
+        # Migration 002: optional expiry timestamp for a cashier account. NULL means
+        # the account stays active indefinitely (permanent) once enabled. When set,
+        # login is blocked once the current time passes this timestamp, so the
+        # owner no longer needs to manually re-enable the account every day.
+        "ALTER TABLE users ADD COLUMN active_until TEXT",
+    ]
+    for sql in migrations:
+        try:
+            db.execute(sql)
+            db.commit()
+        except Exception:
+            pass  # Column already exists — safe to ignore
+
     db.close()
 
 # ── Routes ────────────────────────────────────────────────────────────────
@@ -425,6 +445,15 @@ def login():
 
     if not user['is_active']:
         return jsonify({'error': 'Account disabled'}), 403
+
+    active_until = user['active_until']
+    if active_until:
+        expiry = datetime.datetime.fromisoformat(active_until)
+        if datetime.datetime.utcnow() >= expiry:
+            # Auto-expire: flip is_active off so the owner sees an accurate
+            # status on the Settings page instead of a silently-expired date.
+            exec_db("UPDATE users SET is_active=0, active_until=NULL WHERE id=?", (user['id'],))
+            return jsonify({'error': 'Account disabled'}), 403
 
     locked_until = user['locked_until']
     if locked_until:
@@ -489,17 +518,29 @@ def reset_cashier_password():
 def cashier_status():
     cashier_id = request.args.get('cashier_id') or (request.json or {}).get('cashier_id')
     if cashier_id:
-        cashier = query_db("SELECT id,is_active FROM users WHERE id=? AND role='cashier'", (cashier_id,), one=True)
+        cashier = query_db("SELECT id,is_active,active_until FROM users WHERE id=? AND role='cashier'", (cashier_id,), one=True)
     else:
-        cashier = query_db("SELECT id,is_active FROM users WHERE role='cashier' ORDER BY id LIMIT 1", one=True)
+        cashier = query_db("SELECT id,is_active,active_until FROM users WHERE role='cashier' ORDER BY id LIMIT 1", one=True)
     if not cashier:
         return jsonify({'error': 'No cashier'}), 404
     if request.method == 'PUT':
         data = request.json or {}
         status = 1 if data.get('is_active') else 0
-        exec_db("UPDATE users SET is_active=? WHERE id=?", (status, cashier['id']))
-        return jsonify({'ok': True, 'is_active': bool(status)})
-    return jsonify({'is_active': bool(cashier['is_active']), 'id': cashier['id']})
+        active_until = None
+        if status:
+            # days: None/0 -> permanent (active_until stays NULL).
+            # days: positive int -> account auto-disables after that many days.
+            days = data.get('days')
+            if days:
+                try:
+                    days = int(days)
+                except (TypeError, ValueError):
+                    days = None
+                if days and days > 0:
+                    active_until = (datetime.datetime.utcnow() + datetime.timedelta(days=days)).isoformat()
+        exec_db("UPDATE users SET is_active=?, active_until=? WHERE id=?", (status, active_until, cashier['id']))
+        return jsonify({'ok': True, 'is_active': bool(status), 'active_until': active_until})
+    return jsonify({'is_active': bool(cashier['is_active']), 'active_until': cashier['active_until'], 'id': cashier['id']})
 
 # Settings
 @app.route('/api/settings', methods=['GET', 'PUT'])
@@ -753,10 +794,13 @@ def close_shift():
         return jsonify({'error': 'No open shift'}), 404
     data = request.json or {}
     actual = float(data.get('closing_cash', 0))
-    cash_sales = query_db("""SELECT COALESCE(SUM(total),0) as t FROM sales
+    # Expected cash = opening float + cash received - change given out
+    cash_sales = query_db("""SELECT COALESCE(SUM(amount_paid),0) as received,
+                                     COALESCE(SUM(change_given),0) as given_back
+                              FROM sales
                               WHERE shift_id=? AND payment_method='cash' AND status='completed'""",
                           (shift['id'],), one=True)
-    expected = shift['opening_cash'] + cash_sales['t']
+    expected = shift['opening_cash'] + cash_sales['received'] - cash_sales['given_back']
     variance = actual - expected
     exec_db("""UPDATE shifts SET status='closed',closed_at=datetime('now'),
                closing_cash_actual=?,closing_cash_expected=?,variance=? WHERE id=?""",
@@ -873,7 +917,8 @@ def sales():
         line_total = qty * unit_price * (1 - disc_pct / 100)
         subtotal += line_total
         processed_items.append({**item, 'product_name': p['name'], 'unit_price': unit_price,
-                                 'qty': qty, 'disc_pct': disc_pct, 'line_total': line_total})
+                                 'qty': qty, 'disc_pct': disc_pct, 'line_total': line_total,
+                                 'buying_price': float(p['buying_price'])})
 
     disc_amt = subtotal * order_disc / 100
     after_disc = subtotal - disc_amt
@@ -906,10 +951,11 @@ def sales():
     sale_id = cur.lastrowid
 
     for item in processed_items:
-        db.execute("""INSERT INTO sale_items (sale_id,product_id,product_name,qty,unit_price,discount_pct,line_total)
-                   VALUES (?,?,?,?,?,?,?)""",
+        db.execute("""INSERT INTO sale_items (sale_id,product_id,product_name,qty,unit_price,discount_pct,line_total,buying_price_at_sale)
+                   VALUES (?,?,?,?,?,?,?,?)""",
                 (sale_id, item['product_id'], item['product_name'],
-                 item['qty'], item['unit_price'], item['disc_pct'], item['line_total']))
+                 item['qty'], item['unit_price'], item['disc_pct'], item['line_total'],
+                 item['buying_price']))
         db.execute("UPDATE products SET current_stock=current_stock-? WHERE id=?",
                 (item['qty'], item['product_id']))
         db.execute("""INSERT INTO stock_movements (product_id,type,qty_change,reference,created_by)
@@ -922,18 +968,16 @@ def sales():
                 (sale_id, data.get('customer_name'), data.get('customer_phone'), total, total))
 
     db.commit()
-    # Detect items sold below buying price and include in SSE event
+    # Detect items sold below buying price — use buying_price captured at sale time (no extra DB query)
     below_price_items = []
     for item in processed_items:
-        p_row = db.execute("SELECT buying_price, name FROM products WHERE id=?", (item['product_id'],)).fetchone()
-        if p_row:
-            eff_price = item['unit_price'] * (1 - item['disc_pct'] / 100)
-            if eff_price < p_row['buying_price']:
-                below_price_items.append({
-                    'name': item['product_name'],
-                    'selling_price': round(eff_price, 2),
-                    'buying_price': round(p_row['buying_price'], 2),
-                })
+        eff_price = item['unit_price'] * (1 - item['disc_pct'] / 100)
+        if eff_price < item['buying_price']:
+            below_price_items.append({
+                'name': item['product_name'],
+                'selling_price': round(eff_price, 2),
+                'buying_price': round(item['buying_price'], 2),
+            })
     push_event('sale_created', {
         'sale_id': sale_id, 'total': total, 'receipt_no': receipt_no,
         'sold_by': g.user_id,
@@ -1084,10 +1128,11 @@ def dashboard():
     today = datetime.date.today().isoformat()
     if g.role == 'owner':
         revenue = query_db("SELECT COALESCE(SUM(total),0) as t FROM sales WHERE DATE(created_at)=? AND status='completed'", (today,), one=True)['t']
+        cash_revenue = query_db("SELECT COALESCE(SUM(amount_paid),0) as t FROM sales WHERE DATE(created_at)=? AND status='completed' AND is_credit=0", (today,), one=True)['t']
         tx_count = query_db("SELECT COUNT(*) as c FROM sales WHERE DATE(created_at)=? AND status='completed'", (today,), one=True)['c']
-        cogs = query_db("""SELECT COALESCE(SUM(si.qty * p.buying_price),0) as c
+        credit_count = query_db("SELECT COUNT(*) as c FROM sales WHERE DATE(created_at)=? AND status='completed' AND is_credit=1", (today,), one=True)['c']
+        cogs = query_db("""SELECT COALESCE(SUM(si.qty * si.buying_price_at_sale),0) as c
                            FROM sale_items si JOIN sales s ON s.id=si.sale_id
-                           JOIN products p ON p.id=si.product_id
                            WHERE DATE(s.created_at)=? AND s.status='completed'""", (today,), one=True)['c']
         expenses_today = query_db("SELECT COALESCE(SUM(amount),0) as t FROM expenses WHERE expense_date=?", (today,), one=True)['t']
         gross_profit = revenue - cogs
@@ -1104,7 +1149,8 @@ def dashboard():
                                         GROUP BY payment_method""", (today,))
         customers_total = query_db("SELECT COUNT(*) as c FROM sales WHERE status='completed'", one=True)['c']
         return jsonify({
-            'revenue': revenue, 'tx_count': tx_count, 'cogs': cogs,
+            'revenue': revenue, 'cash_revenue': cash_revenue,
+            'tx_count': tx_count, 'credit_count': credit_count, 'cogs': cogs,
             'gross_profit': gross_profit, 'expenses_today': expenses_today, 'net_profit': net_profit,
             'debts_total': debts_total, 'low_stock_count': low_stock_count,
             'top5': rows_to_list(top5), 'payment_breakdown': rows_to_list(payment_breakdown),
@@ -1131,8 +1177,8 @@ def report_pl():
     date_from = request.args.get('from', datetime.date.today().replace(day=1).isoformat())
     date_to = request.args.get('to', datetime.date.today().isoformat())
     revenue = query_db("SELECT COALESCE(SUM(total),0) as t FROM sales WHERE DATE(created_at) BETWEEN ? AND ? AND status='completed'", (date_from, date_to), one=True)['t']
-    cogs = query_db("""SELECT COALESCE(SUM(si.qty * p.buying_price),0) as c
-                       FROM sale_items si JOIN sales s ON s.id=si.sale_id JOIN products p ON p.id=si.product_id
+    cogs = query_db("""SELECT COALESCE(SUM(si.qty * si.buying_price_at_sale),0) as c
+                       FROM sale_items si JOIN sales s ON s.id=si.sale_id
                        WHERE DATE(s.created_at) BETWEEN ? AND ? AND s.status='completed'""", (date_from, date_to), one=True)['c']
     expenses_by_cat = query_db("""SELECT category, SUM(amount) as total FROM expenses
                                    WHERE expense_date BETWEEN ? AND ? GROUP BY category ORDER BY category""", (date_from, date_to))

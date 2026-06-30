@@ -1,7 +1,7 @@
-/* MotoShop Global Styles - Dark Industrial Theme */
+/* MotoShop Global Styles - Dark Industrial Theme (default) + Light Theme */
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
-:root {
+:root, [data-theme="dark"] {
   --bg:        #0f1923;
   --bg2:       #162030;
   --bg3:       #1d2d40;
@@ -23,15 +23,60 @@
   --purple:    #a855f7;
   --shadow:    0 4px 24px rgba(0,0,0,.4);
   --shadow-sm: 0 2px 8px rgba(0,0,0,.3);
+  --on-accent: #fff;
+  --overlay:   rgba(0,0,0,.7);
+  --overlay-soft: rgba(0,0,0,.5);
   --radius:    12px;
   --radius-sm: 8px;
   --font-head: 'Syne', sans-serif;
   --font-body: 'DM Sans', sans-serif;
   --sidebar-w: 240px;
   --topbar-h:  60px;
+  --mobile-nav-h: 0px;
+}
+
+/* Light theme — same semantic variable names, inverted/adjusted palette.
+   Every component in this app reads colors exclusively through these
+   variables, so switching [data-theme] on <html> repaints the entire UI
+   without any component-level changes. Status colors (red/green/amber/etc)
+   are kept close to their dark-theme hues but darkened slightly where
+   needed so text stays AA-contrast-compliant on white/near-white backgrounds. */
+[data-theme="light"] {
+  --bg:        #f4f6f9;
+  --bg2:       #ffffff;
+  --bg3:       #eef1f6;
+  --bg4:       #e4e9f0;
+  --border:    #d8dee8;
+  --border2:   #c2cad8;
+  --text:      #16212e;
+  --text2:     #45566b;
+  --text3:     #6b7a8d;
+  --accent:    #e8500a;
+  --accent2:   #ff6b24;
+  --amber:     #b5740a;
+  --green:     #15803d;
+  --green2:    #16a34a;
+  --red:       #dc2626;
+  --red2:      #b91c1c;
+  --teal:      #0f766e;
+  --blue:      #2563eb;
+  --purple:    #9333ea;
+  --shadow:    0 4px 24px rgba(20,30,45,.10);
+  --shadow-sm: 0 2px 8px rgba(20,30,45,.08);
+  --on-accent: #fff;
+  --overlay:   rgba(15,20,30,.45);
+  --overlay-soft: rgba(15,20,30,.3);
 }
 
 html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font-body); font-size: 14px; line-height: 1.5; -webkit-font-smoothing: antialiased; }
+
+/* Smooth theme switch: only color-related properties transition, so the
+   toggle doesn't feel like a hard flash, while layout/animation performance
+   elsewhere (e.g. cart drawer slide, modal scale-in) stays untouched. */
+body, .card, .topbar, .sidebar, .mobile-nav, .modal, .input, .btn,
+.app-footer, .scroll-page, .pos-cart, .toast {
+  transition: background-color .2s ease, color .2s ease, border-color .2s ease;
+}
 
 #root { height: 100%; display: flex; flex-direction: column; }
 
@@ -53,7 +98,7 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-head); font-weight: 700; }
 /* Sidebar brand */
 .sidebar-brand { padding: 20px 16px 12px; border-bottom: 1px solid var(--border); }
 .brand-logo { display: flex; align-items: center; gap: 10px; }
-.brand-icon { width: 36px; height: 36px; background: var(--accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-family: var(--font-head); font-weight: 800; font-size: 18px; color: #fff; flex-shrink: 0; }
+.brand-icon { width: 36px; height: 36px; background: var(--accent); border-radius: 8px; display: flex; align-items: center; justify-content: center; font-family: var(--font-head); font-weight: 800; font-size: 18px; color: var(--on-accent); flex-shrink: 0; }
 .brand-name { font-family: var(--font-head); font-weight: 800; font-size: 18px; color: var(--text); letter-spacing: -.3px; }
 .brand-sub { font-size: 10px; color: var(--text3); text-transform: uppercase; letter-spacing: 1px; margin-top: 1px; }
 
@@ -62,9 +107,9 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-head); font-weight: 700; }
 .nav-section-label { font-size: 10px; font-weight: 600; color: var(--text3); text-transform: uppercase; letter-spacing: 1.2px; padding: 12px 8px 4px; }
 .nav-item { display: flex; align-items: center; gap: 10px; padding: 9px 12px; border-radius: var(--radius-sm); cursor: pointer; transition: all .15s; color: var(--text2); font-size: 13.5px; font-weight: 500; position: relative; margin-bottom: 2px; user-select: none; }
 .nav-item:hover { background: var(--bg3); color: var(--text); }
-.nav-item.active { background: linear-gradient(90deg, var(--accent) 0%, #c0410a 100%); color: #fff; box-shadow: 0 2px 12px rgba(232,80,10,.3); }
+.nav-item.active { background: linear-gradient(90deg, var(--accent) 0%, var(--accent2) 100%); color: var(--on-accent); box-shadow: 0 2px 12px rgba(232,80,10,.3); }
 .nav-item .nav-icon { font-size: 16px; width: 20px; text-align: center; flex-shrink: 0; }
-.nav-badge { margin-left: auto; background: var(--red); color: #fff; border-radius: 10px; padding: 1px 7px; font-size: 10px; font-weight: 700; animation: pulse-badge 2s infinite; }
+.nav-badge { margin-left: auto; background: var(--red); color: var(--on-accent); border-radius: 10px; padding: 1px 7px; font-size: 10px; font-weight: 700; animation: pulse-badge 2s infinite; }
 @keyframes pulse-badge { 0%,100%{opacity:1} 50%{opacity:.7} }
 
 /* Sidebar user */
@@ -100,13 +145,13 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-head); font-weight: 700; }
 .btn { display: inline-flex; align-items: center; justify-content: center; gap: 6px; padding: 8px 16px; border-radius: var(--radius-sm); font-family: var(--font-body); font-size: 13.5px; font-weight: 600; cursor: pointer; border: none; transition: all .15s; user-select: none; }
 .btn:active { transform: scale(.97); }
 .btn:disabled { opacity: .45; pointer-events: none; }
-.btn-primary { background: var(--accent); color: #fff; }
+.btn-primary { background: var(--accent); color: var(--on-accent); }
 .btn-primary:hover { background: var(--accent2); box-shadow: 0 4px 12px rgba(232,80,10,.35); }
 .btn-secondary { background: var(--bg3); color: var(--text); border: 1px solid var(--border2); }
 .btn-secondary:hover { background: var(--bg4); }
-.btn-success { background: var(--green2); color: #fff; }
+.btn-success { background: var(--green2); color: var(--on-accent); }
 .btn-success:hover { background: var(--green); }
-.btn-danger { background: var(--red2); color: #fff; }
+.btn-danger { background: var(--red2); color: var(--on-accent); }
 .btn-danger:hover { background: var(--red); }
 .btn-ghost { background: transparent; color: var(--text2); }
 .btn-ghost:hover { background: var(--bg3); color: var(--text); }
@@ -147,7 +192,7 @@ td.center, th.center { text-align: center; }
 .badge-gray { background: var(--bg3); color: var(--text3); border: 1px solid var(--border); }
 
 /* Modal */
-.modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.7); backdrop-filter: blur(4px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px; animation: fade-in .2s; }
+.modal-overlay { position: fixed; inset: 0; background: var(--overlay); backdrop-filter: blur(4px); z-index: 1000; display: flex; align-items: center; justify-content: center; padding: 16px; padding-bottom: calc(var(--mobile-nav-h) + 16px); animation: fade-in .2s; }
 @keyframes fade-in { from{opacity:0} to{opacity:1} }
 .modal { background: var(--bg2); border: 1px solid var(--border2); border-radius: var(--radius); width: 100%; max-width: 560px; max-height: 90vh; overflow-y: auto; animation: modal-in .25s cubic-bezier(.34,1.56,.64,1); }
 @keyframes modal-in { from{opacity:0;transform:scale(.9)translateY(20px)} to{opacity:1;transform:scale(1)translateY(0)} }
@@ -159,7 +204,7 @@ td.center, th.center { text-align: center; }
 .modal-footer { padding: 14px 20px; border-top: 1px solid var(--border); display: flex; gap: 10px; justify-content: flex-end; }
 
 /* Toast */
-.toast-container { position: fixed; bottom: 80px; right: 16px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
+.toast-container { position: fixed; bottom: calc(var(--mobile-nav-h) + 16px); right: 16px; z-index: 9999; display: flex; flex-direction: column; gap: 8px; pointer-events: none; }
 .toast { background: var(--bg2); border: 1px solid var(--border2); border-radius: var(--radius-sm); padding: 12px 16px; font-size: 13.5px; display: flex; align-items: center; gap: 10px; box-shadow: var(--shadow); min-width: 240px; max-width: 360px; animation: toast-in .3s cubic-bezier(.34,1.56,.64,1); pointer-events: all; }
 @keyframes toast-in { from{opacity:0;transform:translateX(60px)} to{opacity:1;transform:translateX(0)} }
 .toast-success { border-left: 3px solid var(--green); }
@@ -198,7 +243,7 @@ td.center, th.center { text-align: center; }
 .cart-item-name { font-weight: 600; font-size: 13px; }
 .cart-item-controls { display: flex; align-items: center; gap: 6px; margin-top: 6px; }
 .qty-btn { width: 26px; height: 26px; background: var(--bg4); border: 1px solid var(--border2); border-radius: 6px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 14px; color: var(--text); transition: all .1s; }
-.qty-btn:hover { background: var(--accent); border-color: var(--accent); color: #fff; }
+.qty-btn:hover { background: var(--accent); border-color: var(--accent); color: var(--on-accent); }
 .qty-input { width: 44px; text-align: center; }
 .cart-footer { border-top: 1px solid var(--border); padding: 14px 16px; flex-shrink: 0; }
 .total-line { display: flex; justify-content: space-between; font-size: 13px; color: var(--text2); margin-bottom: 4px; }
@@ -220,9 +265,12 @@ td.center, th.center { text-align: center; }
 .pl-row.total { background: var(--bg3); font-weight: 700; font-size: 15px; }
 .pl-row.profit { background: rgba(34,197,94,.08); color: var(--green); font-weight: 700; }
 .pl-row.loss { background: rgba(239,68,68,.08); color: var(--red); font-weight: 700; }
-.pl-row.grand { background: var(--accent); color: #fff; font-family: var(--font-head); font-size: 16px; font-weight: 700; }
+.pl-row.grand { background: var(--accent); color: var(--on-accent); font-family: var(--font-head); font-size: 16px; font-weight: 700; }
 
 /* Receipt */
+/* Intentionally NOT theme-aware: a sales receipt mimics real printed paper
+   (thermal printer output) and must stay white-background/black-text in
+   both light and dark app themes, exactly like a physical receipt would. */
 .receipt { background: #fff; color: #111; width: 100%; max-width: 320px; margin: 0 auto; padding: 20px; font-family: 'Courier New', monospace; font-size: 12px; }
 .receipt-logo { text-align: center; font-size: 20px; font-weight: 800; font-family: sans-serif; margin-bottom: 8px; }
 .receipt-divider { border-bottom: 1px dashed #999; margin: 8px 0; }
@@ -250,21 +298,27 @@ td.center, th.center { text-align: center; }
 
 /* Responsive */
 @media (max-width: 900px) {
-  :root { --sidebar-w: 0px; }
+  :root { --sidebar-w: 0px; --mobile-nav-h: calc(52px + env(safe-area-inset-bottom)); }
   .sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 260px; transform: translateX(-100%); }
-  .sidebar.open { transform: translateX(0); box-shadow: 4px 0 32px rgba(0,0,0,.5); }
-  .sidebar-overlay { position: fixed; inset: 0; background: rgba(0,0,0,.5); z-index: 99; display: none; }
+  .sidebar.open { transform: translateX(0); box-shadow: 4px 0 32px var(--overlay-soft); }
+  .sidebar-overlay { position: fixed; inset: 0; background: var(--overlay-soft); z-index: 99; display: none; }
   .sidebar-overlay.show { display: block; }
   .pos-layout { grid-template-columns: 1fr; }
   .pos-cart { position: fixed; bottom: 0; left: 0; right: 0; height: 60vh; border-top: 2px solid var(--accent); border-left: none; border-radius: var(--radius) var(--radius) 0 0; z-index: 200; transform: translateY(100%); transition: transform .3s cubic-bezier(.4,0,.2,1); }
   /* FIX: .mobile-nav sits at z-index 300, above the cart drawer's old
      z-index 200 — so the bottom nav bar painted over the checkout/total
      buttons at the bottom of an open cart, making them unreachable. The
-     open cart is a modal-like overlay and should sit above the nav bar. */
-  .pos-cart.open { transform: translateY(0); z-index: 310; padding-bottom: max(12px, env(safe-area-inset-bottom)); }
+     open cart is a modal-like overlay and should sit above the nav bar,
+     and its own footer must clear the nav bar's actual height (not just
+     the safe-area inset) so the checkout button is always reachable. */
+  .pos-cart.open { transform: translateY(0); z-index: 310; padding-bottom: var(--mobile-nav-h); }
   .grid-4 { grid-template-columns: repeat(2,1fr); }
   .grid-3 { grid-template-columns: repeat(2,1fr); }
   .page-content { padding: 16px; }
+  /* Top menu on mobile shows the logo icon only — the shop name/subtitle
+     stay reserved for the sidebar (.brand-name/.brand-sub), which is one
+     tap away via the hamburger button, so nothing is actually lost. */
+  .topbar-titles { display: none; }
 }
 
 @media (max-width: 480px) {
@@ -285,7 +339,7 @@ td.center, th.center { text-align: center; }
 
 @media (max-width: 900px) {
   .mobile-nav { display: block; }
-  .scroll-page, .page-content { padding-bottom: 80px; }
+  .scroll-page, .page-content { padding-bottom: calc(var(--mobile-nav-h) + 16px); }
 }
 
 /* Utility */
@@ -344,7 +398,7 @@ td.center, th.center { text-align: center; }
 
 /* Qty buttons */
 .qty-btn { width: 28px !important; height: 28px !important; background: var(--bg4); border: 1.5px solid var(--border2); border-radius: 7px; display: flex; align-items: center; justify-content: center; cursor: pointer; font-size: 16px; font-weight: 700; color: var(--text); transition: all .15s; flex-shrink: 0; }
-.qty-btn:hover { background: var(--accent); border-color: var(--accent); color: #fff; transform: scale(1.1); }
+.qty-btn:hover { background: var(--accent); border-color: var(--accent); color: var(--on-accent); transform: scale(1.1); }
 .qty-btn:active { transform: scale(.95); }
 
 /* ── Topbar enhancements ─────────────────────────────────────────────────── */
@@ -363,7 +417,7 @@ td.center, th.center { text-align: center; }
 .online-badge.online .online-dot { background: var(--green); box-shadow: 0 0 5px var(--green); }
 .online-badge.offline .online-dot { background: var(--red); }
 .online-label { }
-.sync-badge { background: var(--amber); color: #000; border-radius: 10px; padding: 1px 6px; font-size: 10px; font-weight: 700; margin-left: 2px; }
+.sync-badge { background: var(--amber); color: var(--on-accent); border-radius: 10px; padding: 1px 6px; font-size: 10px; font-weight: 700; margin-left: 2px; }
 
 /* ── Footer ─────────────────────────────────────────────────────────────── */
 .app-footer { padding: 8px 24px; background: var(--bg2); border-top: 1px solid var(--border); display: flex; align-items: center; gap: 8px; font-size: 11px; color: var(--text3); flex-shrink: 0; }
