@@ -84,9 +84,9 @@ export default function Shell() {
               <span className="online-label">{isOnline ? T('online') : T('offline')}</span>
               {pendingSyncCount > 0 && <span className="sync-badge">{pendingSyncCount}</span>}
             </div>
-            <span style={{display:'flex',alignItems:'center',gap:5,fontSize:11,color:'var(--text3)'}}>
+            <span className="sse-indicator" style={{display:'flex',alignItems:'center',gap:5,fontSize:11,color:'var(--text3)'}}>
               <span className={`sse-dot ${sseConnected ? '' : 'offline'}`} />
-              {sseConnected ? T('live') : '—'}
+              <span className="sse-label">{sseConnected ? T('live') : '—'}</span>
             </span>
             <button
               className="btn btn-ghost btn-icon"
@@ -97,7 +97,10 @@ export default function Shell() {
             >
               {theme === 'light' ? '🌙' : '☀️'}
             </button>
-            <button className="btn btn-ghost btn-sm" onClick={logout} style={{fontSize:12}}>{T('logout')}</button>
+            <button className="btn btn-ghost btn-sm btn-logout" onClick={logout} aria-label={T('logout')} title={T('logout')} style={{fontSize:12}}>
+              <span className="btn-logout-icon">🚪</span>
+              <span className="btn-logout-label">{T('logout')}</span>
+            </button>
           </div>
         </div>
 
