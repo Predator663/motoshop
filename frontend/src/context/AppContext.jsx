@@ -18,8 +18,28 @@ export function AppProvider({ children }) {
   const [settings, setSettings] = useState({})
   const [isOnline, setIsOnline] = useState(navigator.onLine)
   const [pendingSyncCount, setPendingSyncCount] = useState(0)
+  // ── Theme (device/browser preference, not synced to backend shop settings) ──
+  const [theme, setThemeState] = useState(() => {
+    const saved = localStorage.getItem('motoshop_theme')
+    if (saved === 'light' || saved === 'dark') return saved
+    // No saved preference yet — respect the OS/browser preference if available.
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: light)').matches) return 'light'
+    return 'dark'
+  })
   const sseRef = useRef(null)
   const sseCallbacks = useRef([])
+
+  // Apply the theme to <html data-theme="..."> so every CSS variable in
+  // global.css repaints immediately, and persist the choice per-device.
+  useEffect(() => {
+    document.documentElement.setAttribute('data-theme', theme)
+    localStorage.setItem('motoshop_theme', theme)
+    const meta = document.querySelector('meta[name="theme-color"]')
+    if (meta) meta.setAttribute('content', theme === 'light' ? '#f4f6f9' : '#0f1923')
+  }, [theme])
+
+  const setTheme = useCallback((t) => setThemeState(t === 'light' ? 'light' : 'dark'), [])
+  const toggleTheme = useCallback(() => setThemeState(t => t === 'light' ? 'dark' : 'light'), [])
 
   // ── Online / offline ──────────────────────────────────────────────────
   useEffect(() => {
@@ -145,6 +165,7 @@ export function AppProvider({ children }) {
       settings, setSettings,
       currency, lang,
       isOnline, pendingSyncCount, setPendingSyncCount,
+      theme, setTheme, toggleTheme,
     }}>
       {children}
     </AppContext.Provider>

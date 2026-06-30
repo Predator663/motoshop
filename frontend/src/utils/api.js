@@ -48,7 +48,7 @@ export const api = {
   changePassword:     (old_password, new_password) => api.post('/auth/change-password', { old_password, new_password }),
   resetCashierPw:     (new_password, cashier_id) => api.post('/auth/reset-cashier-password', { new_password, ...(cashier_id != null ? { cashier_id } : {}) }),
   getCashierStatus:   () => api.get('/auth/cashier-status'),
-  setCashierStatus:   (is_active) => api.put('/auth/cashier-status', { is_active }),
+  setCashierStatus:   (is_active, days) => api.put('/auth/cashier-status', { is_active, ...(days != null ? { days } : {}) }),
 
   // Setup
   setupStatus:        () => api.get('/setup/status'),

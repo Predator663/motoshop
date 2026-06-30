@@ -241,7 +241,7 @@ export default function POSPage() {
                 🛒
                 {cart.length > 0 && (
                   <span style={{
-                    position:'absolute',top:-6,right:-6,background:'var(--red)',color:'#fff',
+                    position:'absolute',top:-6,right:-6,background:'var(--red)',color:'var(--on-accent)',
                     borderRadius:'50%',width:18,height:18,fontSize:10,fontWeight:700,
                     display:'flex',alignItems:'center',justifyContent:'center'
                   }}>{cart.length}</span>

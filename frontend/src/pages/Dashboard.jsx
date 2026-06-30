@@ -43,10 +43,10 @@ function OwnerDash({ data, currency, setActiveTab, T }) {
         <button className="btn btn-primary btn-sm" onClick={() => setActiveTab('pos')}>{T('dash_new_sale')}</button>
       </div>
       <div className="grid grid-4" style={{marginBottom:20}}>
-        <StatCard label={T('dash_revenue')} value={formatMoney(d.revenue, currency)} color="var(--amber)" icon="💰" delay={0} />
+        <StatCard label={T('dash_revenue')} value={formatMoney(d.revenue, currency)} color="var(--amber)" icon="💰" delay={0} sub={d.cash_revenue != null && d.cash_revenue !== d.revenue ? `Taslimu: ${formatMoney(d.cash_revenue, currency)}` : undefined} />
         <StatCard label={T('dash_gross_profit')} value={formatMoney(d.gross_profit, currency)} color="var(--green)" icon="📈" delay={80} />
         <StatCard label={T('dash_net_profit')} value={formatMoney(d.net_profit, currency)} color={d.net_profit >= 0 ? 'var(--green)' : 'var(--red)'} icon="🏦" delay={160} />
-        <StatCard label={T('dash_transactions')} value={d.tx_count || 0} color="var(--teal)" icon="🧾" delay={240} sub={`${d.customers_total || 0} ${T('dash_lifetime_customers')}`} />
+        <StatCard label={T('dash_transactions')} value={d.tx_count || 0} color="var(--teal)" icon="🧾" delay={240} sub={`${d.customers_total || 0} ${T('dash_lifetime_customers')}${d.credit_count > 0 ? ' · ' + d.credit_count + ' mkopo' : ''}`} />
       </div>
       <div className="grid grid-4" style={{marginBottom:24}}>
         <StatCard label={T('dash_expenses')} value={formatMoney(d.expenses_today, currency)} color="var(--red)" icon="💸" delay={80} />
