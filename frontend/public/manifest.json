@@ -1,0 +1,9 @@
+{
+  "name": "MotoShop",
+  "short_name": "MotoShop",
+  "description": "Mfumo wa Usimamizi wa Duka la Pikipiki",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0f1923",
+  "theme_color": "#e8500a"
+}
