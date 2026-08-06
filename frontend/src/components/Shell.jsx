@@ -13,6 +13,7 @@ import ShiftsPage from '../pages/ShiftsPage'
 import SettingsPage from '../pages/SettingsPage'
 import ProfilePage from '../pages/ProfilePage'
 import StockPage from '../pages/StockPage'
+import TrashPage from '../pages/TrashPage'
 
 export default function Shell() {
   const { auth, activeTab, setActiveTab, sseConnected, logout, settings, isOnline, pendingSyncCount, theme, toggleTheme,
@@ -25,7 +26,7 @@ export default function Shell() {
   // false = hidden from everyone, owner included.
   const featureFlags = systemStatus?.feature_flags || {}
   const enabled = (tab) => featureFlags[tab] !== false
-  const OWNER_TABS = ['dashboard','pos','sales','debts','products','stock','expenses','reports','shifts','settings','profile'].filter(enabled)
+  const OWNER_TABS = ['dashboard','pos','sales','debts','products','stock','expenses','reports','shifts','settings','trash','profile'].filter(enabled)
   const CASHIER_TABS = ['dashboard','pos','sales','stock','shifts','profile'].filter(enabled)
 
   useEffect(() => {
@@ -41,6 +42,7 @@ export default function Shell() {
     reports: auth?.role === 'owner' ? <ReportsPage /> : null,
     shifts: <ShiftsPage />,
     settings: auth?.role === 'owner' ? <SettingsPage /> : null,
+    trash: auth?.role === 'owner' ? <TrashPage /> : null,
     profile: <ProfilePage />,
   }
 

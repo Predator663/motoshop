@@ -23,6 +23,7 @@ export default function Sidebar({ isOpen, onClose, activeTab, onNav }) {
     { key:'shifts',   icon:'⏱️', label: T('nav_shifts') },
     { section: T('nav_section_system') },
     { key:'settings', icon:'⚙️', label: T('nav_settings') },
+    { key:'trash',    icon:'🗑️', label: T('nav_trash') },
     { key:'profile',  icon:'👤', label: T('nav_profile') },
   ]
 

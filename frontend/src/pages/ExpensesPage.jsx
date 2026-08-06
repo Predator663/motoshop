@@ -209,7 +209,7 @@ export default function ExpensesPage() {
             </>
           }
         >
-          <p style={{color:'var(--text2)'}}>This will permanently remove the expense record.</p>
+          <p style={{color:'var(--text2)'}}>This moves the expense to Trash — it can be restored later, or permanently deleted from there.</p>
         </Modal>
       )}
     </div>

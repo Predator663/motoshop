@@ -245,6 +245,15 @@ export const api = {
   adjustStock:        (id, d) => mutateOrQueue('POST', '/products/' + id + '/adjust', d, 'stock_adjust'),
   getMovements:       (id) => api.get('/products/' + id + '/movements'),
 
+  // Trash (soft-delete management) — owner only. Not queued offline: the
+  // list, restore, and permanent-delete all need a live server check
+  // (referential integrity, what's currently in Trash), same reasoning
+  // as deleteProduct/deleteCategory above.
+  getTrash:           () => api.get('/trash'),
+  restoreTrashItem:   (type, id) => api.post(`/trash/${type}/${id}/restore`, {}),
+  hardDeleteTrashItem:(type, id) => api.delete(`/trash/${type}/${id}`),
+  emptyTrash:         () => api.delete('/trash'),
+
   // Stock realtime
   getStockRealtime:   () => api.get('/stock/realtime'),
 

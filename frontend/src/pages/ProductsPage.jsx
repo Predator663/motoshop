@@ -273,7 +273,7 @@ export default function ProductsPage() {
 
       {/* Delete confirm */}
       {deleteConfirm && (
-        <Modal title="Delete Product?" onClose={() => setDeleteConfirm(null)}
+        <Modal title={T('products_delete_confirm')} onClose={() => setDeleteConfirm(null)}
           footer={
             <>
               <button className="btn btn-secondary" onClick={() => setDeleteConfirm(null)}>{T('cancel')}</button>
@@ -281,7 +281,7 @@ export default function ProductsPage() {
             </>
           }
         >
-          <p style={{color:'var(--text2)'}}>{T('products_delete_failed')}</p>
+          <p style={{color:'var(--text2)'}}>{T('products_delete_confirm')}</p>
         </Modal>
       )}
     </div>

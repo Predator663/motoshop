@@ -5,8 +5,8 @@
 *.db
 *.db-wal
 *.db-shm
-.sqlite
-.sqlite3
+*.sqlite
+*.sqlite3
 backend/motoshop.db
 backend/instance/
 

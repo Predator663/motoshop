@@ -149,6 +149,22 @@ def exec_db(sql, args=()):
 def rows_to_list(rows):
     return [dict(r) for r in rows]
 
+def clean_fk(value):
+    """Normalize an optional foreign-key field coming from request JSON.
+    A <select> with a "— None —" option (category pickers, etc.) submits
+    '' rather than null when nothing is chosen. With PRAGMA foreign_keys=ON,
+    binding '' straight into a REFERENCES column is NOT treated as "no
+    value" — SQLite checks it against the parent table, finds no match,
+    and raises IntegrityError, which previously surfaced to the user as
+    the whole save silently failing. '', None, and 'null' all mean
+    "no relation" and must become SQL NULL."""
+    if value in (None, '', 'null'):
+        return None
+    try:
+        return int(value)
+    except (TypeError, ValueError):
+        return None
+
 # ── Professional PDF report generation ──────────────────────────────────
 # Shared letterhead/branding pulled straight from Settings (shop_name, logo,
 # address, phone, currency) so every exported report matches the shop's own
@@ -686,7 +702,9 @@ def init_db():
 
         CREATE TABLE IF NOT EXISTS categories (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
-            name TEXT UNIQUE NOT NULL
+            name TEXT UNIQUE NOT NULL,
+            deleted_at TEXT,
+            deleted_by INTEGER REFERENCES users(id)
         );
 
         CREATE TABLE IF NOT EXISTS products (
@@ -704,6 +722,8 @@ def init_db():
             moto_compat TEXT,
             notes TEXT,
             is_active INTEGER NOT NULL DEFAULT 1,
+            deleted_at TEXT,
+            deleted_by INTEGER REFERENCES users(id),
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
 
@@ -802,6 +822,8 @@ def init_db():
             expense_date TEXT NOT NULL,
             payment_method TEXT NOT NULL DEFAULT 'cash',
             created_by INTEGER NOT NULL REFERENCES users(id),
+            deleted_at TEXT,
+            deleted_by INTEGER REFERENCES users(id),
             created_at TEXT NOT NULL DEFAULT (datetime('now'))
         );
 
@@ -851,6 +873,17 @@ def init_db():
         # login is blocked once the current time passes this timestamp, so the
         # owner no longer needs to manually re-enable the account every day.
         "ALTER TABLE users ADD COLUMN active_until TEXT",
+        # Migration 004: soft-delete support (Trash) for products, categories,
+        # and expenses. deleted_at NULL = active/visible everywhere as before;
+        # a timestamp means it's sitting in Trash — hidden from every normal
+        # list/dropdown but still on disk until an owner restores it or
+        # permanently (hard) deletes it from the Trash page.
+        "ALTER TABLE products ADD COLUMN deleted_at TEXT",
+        "ALTER TABLE products ADD COLUMN deleted_by INTEGER REFERENCES users(id)",
+        "ALTER TABLE categories ADD COLUMN deleted_at TEXT",
+        "ALTER TABLE categories ADD COLUMN deleted_by INTEGER REFERENCES users(id)",
+        "ALTER TABLE expenses ADD COLUMN deleted_at TEXT",
+        "ALTER TABLE expenses ADD COLUMN deleted_by INTEGER REFERENCES users(id)",
     ]
     for sql in migrations:
         try:
@@ -1189,7 +1222,7 @@ def backup():
 @require_auth
 def categories():
     if request.method == 'GET':
-        rows = query_db("SELECT * FROM categories ORDER BY name")
+        rows = query_db("SELECT * FROM categories WHERE deleted_at IS NULL ORDER BY name")
         return jsonify(rows_to_list(rows))
     if g.role not in ('owner', 'superuser'):
         return jsonify({'error': 'Owner only'}), 403
@@ -1206,10 +1239,12 @@ def categories():
 @require_owner
 def category_detail(cid):
     if request.method == 'DELETE':
-        used = query_db("SELECT COUNT(*) as c FROM products WHERE category_id=?", (cid,), one=True)
-        if used['c'] > 0:
-            return jsonify({'error': 'Category in use'}), 409
-        exec_db("DELETE FROM categories WHERE id=?", (cid,))
+        # FIX (Trash): moved to Trash instead of removed outright — reversible,
+        # and no longer blocked by "category in use" since nothing is actually
+        # destroyed yet. It just disappears from pickers/lists until restored
+        # or permanently deleted from the Trash page (which re-checks usage).
+        exec_db("UPDATE categories SET deleted_at=datetime('now'), deleted_by=? WHERE id=?", (g.user_id, cid))
+        push_event('category_deleted', {'id': cid})
         return jsonify({'ok': True})
     data = request.json or {}
     exec_db("UPDATE categories SET name=? WHERE id=?", (data.get('name','').strip(), cid))
@@ -1227,7 +1262,7 @@ def products():
             FROM products p
             LEFT JOIN categories c ON c.id = p.category_id
         """
-        conditions = []
+        conditions = ["p.deleted_at IS NULL"]
         if active_only == '1':
             conditions.append("p.is_active=1")
         if conditions:
@@ -1254,7 +1289,7 @@ def products():
         VALUES (?,?,?,?,?,?,?,?,?,?,?,1)
     """, (
         data['name'].strip(), sku,
-        data.get('category_id'), data.get('buying_price', 0),
+        clean_fk(data.get('category_id')), data.get('buying_price', 0),
         data['selling_price'], data.get('min_stock', 0),
         data.get('unit_type', 'Piece'), 1 if data.get('allow_decimal') else 0,
         data.get('shelf_location'), data.get('moto_compat'), data.get('notes')
@@ -1266,7 +1301,7 @@ def products():
 @require_auth
 def product_detail(pid):
     if request.method == 'GET':
-        row = query_db("SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON c.id=p.category_id WHERE p.id=?", (pid,), one=True)
+        row = query_db("SELECT p.*, c.name as category_name FROM products p LEFT JOIN categories c ON c.id=p.category_id WHERE p.id=? AND p.deleted_at IS NULL", (pid,), one=True)
         if not row:
             return jsonify({'error': 'Not found'}), 404
         return jsonify(strip_cost_fields(dict(row), g.role))
@@ -1275,10 +1310,11 @@ def product_detail(pid):
         return jsonify({'error': 'Owner only'}), 403
 
     if request.method == 'DELETE':
-        used = query_db("SELECT COUNT(*) as c FROM sale_items WHERE product_id=?", (pid,), one=True)
-        if used['c'] > 0:
-            return jsonify({'error': 'Cannot delete — product has sales history. Deactivate instead.'}), 409
-        exec_db("DELETE FROM products WHERE id=?", (pid,))
+        # FIX (Trash): soft-delete only. Sales history is completely unaffected
+        # (rows aren't touched), so the old "has sales history" block is gone —
+        # any product can now be moved to Trash. Permanent removal still checks
+        # that history from the Trash page's hard-delete endpoint.
+        exec_db("UPDATE products SET deleted_at=datetime('now'), deleted_by=? WHERE id=?", (g.user_id, pid))
         push_event('product_deleted', {'id': pid})
         return jsonify({'ok': True})
 
@@ -1288,7 +1324,7 @@ def product_detail(pid):
             min_stock=?,unit_type=?,allow_decimal=?,shelf_location=?,moto_compat=?,
             notes=?,is_active=? WHERE id=?
     """, (
-        data.get('name'), data.get('category_id'), data.get('buying_price', 0),
+        data.get('name'), clean_fk(data.get('category_id')), data.get('buying_price', 0),
         data.get('selling_price', 0), data.get('min_stock', 0),
         data.get('unit_type', 'Piece'), 1 if data.get('allow_decimal') else 0,
         data.get('shelf_location'), data.get('moto_compat'), data.get('notes'),
@@ -1305,6 +1341,13 @@ def receive_stock(pid):
     cost = float(data.get('cost_per_unit', 0))
     if qty <= 0:
         return jsonify({'error': 'Quantity must be positive'}), 400
+    # FIX: previously ran unconditionally — receiving stock against a
+    # deleted/nonexistent product id silently no-opped the UPDATE but still
+    # inserted a stock_movements row, which crashes with a FOREIGN KEY
+    # IntegrityError (product_id there is NOT NULL REFERENCES products).
+    exists = query_db("SELECT 1 FROM products WHERE id=? AND deleted_at IS NULL", (pid,), one=True)
+    if not exists:
+        return jsonify({'error': 'Not found'}), 404
     exec_db("UPDATE products SET current_stock=current_stock+? WHERE id=?", (qty, pid))
     exec_db("""INSERT INTO stock_movements (product_id,type,qty_change,cost_per_unit,note,created_by)
                VALUES (?,?,?,?,?,?)""", (pid, 'receive', qty, cost, data.get('note'), g.user_id))
@@ -1319,7 +1362,7 @@ def adjust_stock(pid):
     reason = data.get('reason', 'Correction')
     if change == 0:
         return jsonify({'error': 'Change cannot be zero'}), 400
-    product = query_db("SELECT current_stock FROM products WHERE id=?", (pid,), one=True)
+    product = query_db("SELECT current_stock FROM products WHERE id=? AND deleted_at IS NULL", (pid,), one=True)
     if not product:
         return jsonify({'error': 'Not found'}), 404
     new_stock = product['current_stock'] + change
@@ -1353,7 +1396,7 @@ def stock_realtime():
                (p.current_stock * p.selling_price) as stock_value
         FROM products p
         LEFT JOIN categories c ON c.id = p.category_id
-        WHERE p.is_active=1
+        WHERE p.is_active=1 AND p.deleted_at IS NULL
         ORDER BY p.current_stock ASC
     """, (multiplier,))
     data = rows_to_list(rows)
@@ -1517,7 +1560,7 @@ def sales():
     processed_items = []
     for item in items:
         p = db.execute(
-            "SELECT * FROM products WHERE id=? AND is_active=1", (item['product_id'],)
+            "SELECT * FROM products WHERE id=? AND is_active=1 AND deleted_at IS NULL", (item['product_id'],)
         ).fetchone()
         if not p:
             return jsonify({'error': f"Product {item['product_id']} not found"}), 400
@@ -1706,7 +1749,8 @@ def expenses():
             conditions.append("expense_date<=?"); args.append(date_to)
         if category:
             conditions.append("category=?"); args.append(category)
-        where = ("WHERE " + " AND ".join(conditions)) if conditions else ""
+        conditions.append("deleted_at IS NULL")
+        where = "WHERE " + " AND ".join(conditions)
         rows = query_db(f"SELECT * FROM expenses {where} ORDER BY expense_date DESC,created_at DESC", args)
         return jsonify(rows_to_list(rows))
     data = request.json or {}
@@ -1722,20 +1766,158 @@ def expenses():
 @app.route('/api/expenses/<int:eid>', methods=['PUT', 'DELETE'])
 @require_owner
 def expense_detail(eid):
-    exp = query_db("SELECT * FROM expenses WHERE id=?", (eid,), one=True)
+    exp = query_db("SELECT * FROM expenses WHERE id=? AND deleted_at IS NULL", (eid,), one=True)
     if not exp:
         return jsonify({'error': 'Not found'}), 404
     today = datetime.date.today().isoformat()
     if exp['created_at'][:10] != today:
         return jsonify({'error': "Can only edit/delete today's expenses"}), 403
     if request.method == 'DELETE':
-        exec_db("DELETE FROM expenses WHERE id=?", (eid,))
+        # FIX (Trash): soft-delete, restorable from the Trash page.
+        exec_db("UPDATE expenses SET deleted_at=datetime('now'), deleted_by=? WHERE id=?", (g.user_id, eid))
+        push_event('expense_deleted', {'id': eid})
         return jsonify({'ok': True})
     data = request.json or {}
     exec_db("UPDATE expenses SET amount=?,category=?,description=?,expense_date=?,payment_method=? WHERE id=?",
             (float(data.get('amount',0)), data.get('category'), data.get('description'),
              data.get('expense_date'), data.get('payment_method','cash'), eid))
     return jsonify({'ok': True})
+
+# ── Trash (soft-delete management) ──────────────────────────────────────
+# Products, Categories, and Expenses are soft-deleted (see deleted_at/
+# deleted_by columns + migrations above). This section lists everything
+# currently in Trash, restores items back to normal, and permanently
+# (hard) deletes them — either one at a time or the whole Trash at once.
+TRASH_TABLES = {
+    'product':  {'table': 'products',   'name_col': 'name'},
+    'category': {'table': 'categories', 'name_col': 'name'},
+    'expense':  {'table': 'expenses',   'name_col': 'category'},
+}
+
+@app.route('/api/trash', methods=['GET'])
+@require_owner
+def trash_list():
+    items = []
+
+    prods = query_db("""
+        SELECT p.*, c.name as category_name, u.username as deleted_by_name
+        FROM products p
+        LEFT JOIN categories c ON c.id = p.category_id
+        LEFT JOIN users u ON u.id = p.deleted_by
+        WHERE p.deleted_at IS NOT NULL
+    """)
+    for r in rows_to_list(prods):
+        items.append({
+            'entity_type': 'product', 'id': r['id'], 'title': r['name'],
+            'subtitle': f"{r['sku']}" + (f" · {r['category_name']}" if r['category_name'] else ''),
+            'meta': {'selling_price': r['selling_price'], 'buying_price': r['buying_price'],
+                      'current_stock': r['current_stock'], 'unit_type': r['unit_type'], 'sku': r['sku']},
+            'deleted_at': r['deleted_at'], 'deleted_by_name': r['deleted_by_name'],
+        })
+
+    cats = query_db("""
+        SELECT c.*, u.username as deleted_by_name,
+               (SELECT COUNT(*) FROM products WHERE category_id=c.id) as products_using
+        FROM categories c
+        LEFT JOIN users u ON u.id = c.deleted_by
+        WHERE c.deleted_at IS NOT NULL
+    """)
+    for r in rows_to_list(cats):
+        items.append({
+            'entity_type': 'category', 'id': r['id'], 'title': r['name'],
+            'subtitle': f"{r['products_using']} product(s) reference this" if r['products_using'] else 'Category',
+            'meta': {'products_using': r['products_using']},
+            'deleted_at': r['deleted_at'], 'deleted_by_name': r['deleted_by_name'],
+        })
+
+    exps = query_db("""
+        SELECT e.*, u.username as deleted_by_name
+        FROM expenses e
+        LEFT JOIN users u ON u.id = e.deleted_by
+        WHERE e.deleted_at IS NOT NULL
+    """)
+    for r in rows_to_list(exps):
+        items.append({
+            'entity_type': 'expense', 'id': r['id'], 'title': r['category'],
+            'subtitle': (r['description'] or '') + (f" · {r['expense_date']}" if r['expense_date'] else ''),
+            'meta': {'amount': r['amount'], 'expense_date': r['expense_date'], 'payment_method': r['payment_method']},
+            'deleted_at': r['deleted_at'], 'deleted_by_name': r['deleted_by_name'],
+        })
+
+    items.sort(key=lambda x: x['deleted_at'] or '', reverse=True)
+    return jsonify(items)
+
+@app.route('/api/trash/<entity_type>/<int:item_id>/restore', methods=['POST'])
+@require_owner
+def trash_restore(entity_type, item_id):
+    if entity_type not in TRASH_TABLES:
+        return jsonify({'error': 'Unknown item type'}), 400
+    table = TRASH_TABLES[entity_type]['table']
+    row = query_db(f"SELECT id FROM {table} WHERE id=? AND deleted_at IS NOT NULL", (item_id,), one=True)
+    if not row:
+        return jsonify({'error': 'Not found in Trash'}), 404
+    exec_db(f"UPDATE {table} SET deleted_at=NULL, deleted_by=NULL WHERE id=?", (item_id,))
+    push_event(f'{entity_type}_restored', {'id': item_id})
+    # Also fire the same event each page's own list already listens for
+    # (ProductsPage/StockPage on product_updated, ExpensesPage would need a
+    # manual refresh — categories are always refetched on modal open), so a
+    # restore from the Trash page shows up live anywhere else it's open.
+    if entity_type == 'product':
+        push_event('product_updated', {'id': item_id})
+    return jsonify({'ok': True})
+
+def _hard_delete_one(entity_type, item_id):
+    """Permanently remove a single trashed row. Returns (ok, error_message).
+    Never touches a row that isn't already soft-deleted, and never breaks
+    referential integrity — anything still referenced elsewhere is refused
+    with a clear reason instead of raising a raw IntegrityError."""
+    if entity_type not in TRASH_TABLES:
+        return False, 'Unknown item type'
+    table = TRASH_TABLES[entity_type]['table']
+    row = query_db(f"SELECT id FROM {table} WHERE id=? AND deleted_at IS NOT NULL", (item_id,), one=True)
+    if not row:
+        return False, 'Not found in Trash'
+
+    if entity_type == 'product':
+        used = query_db("SELECT COUNT(*) as c FROM sale_items WHERE product_id=?", (item_id,), one=True)['c']
+        used += query_db("SELECT COUNT(*) as c FROM stock_movements WHERE product_id=?", (item_id,), one=True)['c']
+        if used > 0:
+            return False, 'Has sales/stock history — cannot be permanently deleted'
+    elif entity_type == 'category':
+        used = query_db("SELECT COUNT(*) as c FROM products WHERE category_id=?", (item_id,), one=True)['c']
+        if used > 0:
+            return False, 'Still referenced by product(s) — cannot be permanently deleted'
+
+    try:
+        exec_db(f"DELETE FROM {table} WHERE id=?", (item_id,))
+    except sqlite3.IntegrityError:
+        return False, 'Still referenced elsewhere — cannot be permanently deleted'
+    push_event(f'{entity_type}_purged', {'id': item_id})
+    return True, None
+
+@app.route('/api/trash/<entity_type>/<int:item_id>', methods=['DELETE'])
+@require_owner
+def trash_hard_delete(entity_type, item_id):
+    ok, err = _hard_delete_one(entity_type, item_id)
+    if not ok:
+        return jsonify({'error': err}), 409
+    return jsonify({'ok': True})
+
+@app.route('/api/trash', methods=['DELETE'])
+@require_owner
+def trash_empty():
+    """Empty the whole Trash: permanently delete everything currently in it,
+    skipping (and reporting) anything blocked by referential integrity."""
+    purged, skipped = 0, 0
+    for entity_type, cfg in TRASH_TABLES.items():
+        rows = query_db(f"SELECT id FROM {cfg['table']} WHERE deleted_at IS NOT NULL")
+        for r in rows:
+            ok, _ = _hard_delete_one(entity_type, r['id'])
+            if ok:
+                purged += 1
+            else:
+                skipped += 1
+    return jsonify({'ok': True, 'purged': purged, 'skipped': skipped})
 
 # Dashboard / Reports
 @app.route('/api/dashboard', methods=['GET'])
@@ -1750,12 +1932,12 @@ def dashboard():
         cogs = query_db("""SELECT COALESCE(SUM(si.qty * si.buying_price_at_sale),0) as c
                            FROM sale_items si JOIN sales s ON s.id=si.sale_id
                            WHERE DATE(s.created_at)=? AND s.status='completed'""", (today,), one=True)['c']
-        expenses_today = query_db("SELECT COALESCE(SUM(amount),0) as t FROM expenses WHERE expense_date=?", (today,), one=True)['t']
+        expenses_today = query_db("SELECT COALESCE(SUM(amount),0) as t FROM expenses WHERE expense_date=? AND deleted_at IS NULL", (today,), one=True)['t']
         gross_profit = revenue - cogs
         net_profit = gross_profit - expenses_today
         debts_total = query_db("SELECT COALESCE(SUM(remaining),0) as t FROM debts WHERE status IN ('unpaid','partial')", one=True)['t']
         multiplier = float(query_db("SELECT value FROM settings WHERE key='low_stock_multiplier'", one=True)['value'])
-        low_stock_count = query_db("SELECT COUNT(*) as c FROM products WHERE is_active=1 AND current_stock < min_stock * ?", (multiplier,), one=True)['c']
+        low_stock_count = query_db("SELECT COUNT(*) as c FROM products WHERE is_active=1 AND deleted_at IS NULL AND current_stock < min_stock * ?", (multiplier,), one=True)['c']
         top5 = query_db("""SELECT si.product_name, SUM(si.qty) as qty, SUM(si.line_total) as revenue
                            FROM sale_items si JOIN sales s ON s.id=si.sale_id
                            WHERE DATE(s.created_at)=? AND s.status='completed'
@@ -1780,7 +1962,7 @@ def dashboard():
         else:
             revenue, tx_count = 0, 0
         multiplier = float(query_db("SELECT value FROM settings WHERE key='low_stock_multiplier'", one=True)['value'])
-        low_stock_count = query_db("SELECT COUNT(*) as c FROM products WHERE is_active=1 AND current_stock < min_stock * ?", (multiplier,), one=True)['c']
+        low_stock_count = query_db("SELECT COUNT(*) as c FROM products WHERE is_active=1 AND deleted_at IS NULL AND current_stock < min_stock * ?", (multiplier,), one=True)['c']
         return jsonify({
             'shift_status': 'open' if shift else 'closed',
             'shift_opened': shift['opened_at'] if shift else None,
@@ -1797,7 +1979,7 @@ def report_pl():
                        FROM sale_items si JOIN sales s ON s.id=si.sale_id
                        WHERE DATE(s.created_at) BETWEEN ? AND ? AND s.status='completed'""", (date_from, date_to), one=True)['c']
     expenses_by_cat = query_db("""SELECT category, SUM(amount) as total FROM expenses
-                                   WHERE expense_date BETWEEN ? AND ? GROUP BY category ORDER BY category""", (date_from, date_to))
+                                   WHERE expense_date BETWEEN ? AND ? AND deleted_at IS NULL GROUP BY category ORDER BY category""", (date_from, date_to))
     total_expenses = sum(r['total'] for r in expenses_by_cat)
     gross = revenue - cogs
     net = gross - total_expenses
@@ -1817,7 +1999,7 @@ def report_stock():
                               p.current_stock * p.selling_price as sell_value,
                               (p.current_stock * p.selling_price) - (p.current_stock * p.buying_price) as potential_profit
                        FROM products p LEFT JOIN categories c ON c.id=p.category_id
-                       WHERE p.is_active=1 ORDER BY p.name""")
+                       WHERE p.is_active=1 AND p.deleted_at IS NULL ORDER BY p.name""")
     data = rows_to_list(rows)
     total_cost = sum(r['cost_value'] for r in data)
     total_sell = sum(r['sell_value'] for r in data)
@@ -1873,7 +2055,7 @@ def report_pl_pdf():
                        FROM sale_items si JOIN sales s ON s.id=si.sale_id
                        WHERE DATE(s.created_at) BETWEEN ? AND ? AND s.status='completed'""", (date_from, date_to), one=True)['c']
     expenses_by_cat = rows_to_list(query_db("""SELECT category, SUM(amount) as total FROM expenses
-                                   WHERE expense_date BETWEEN ? AND ? GROUP BY category ORDER BY category""", (date_from, date_to)))
+                                   WHERE expense_date BETWEEN ? AND ? AND deleted_at IS NULL GROUP BY category ORDER BY category""", (date_from, date_to)))
     total_expenses = sum(r['total'] for r in expenses_by_cat)
     gross = revenue - cogs
     net = gross - total_expenses
@@ -1926,7 +2108,7 @@ def report_stock_pdf():
                               p.current_stock * p.selling_price as sell_value,
                               (p.current_stock * p.selling_price) - (p.current_stock * p.buying_price) as potential_profit
                        FROM products p LEFT JOIN categories c ON c.id=p.category_id
-                       WHERE p.is_active=1 ORDER BY p.name"""))
+                       WHERE p.is_active=1 AND p.deleted_at IS NULL ORDER BY p.name"""))
     total_cost = sum(r['cost_value'] for r in rows)
     total_sell = sum(r['sell_value'] for r in rows)
 

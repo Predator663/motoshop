@@ -469,3 +469,45 @@ td.center, th.center { text-align: center; }
 /* ── Animate stock rows on update ───────────────────────────────────────── */
 @keyframes row-flash { 0%{background:rgba(232,80,10,.2)} 100%{background:transparent} }
 .stock-row-updated { animation: row-flash .8s; }
+
+/* ── Trash page ───────────────────────────────────────────────────────────
+   Card grid instead of a table — works naturally at any width and reads
+   better for a mixed bag of item types (product / category / expense). */
+.trash-stats { display: flex; gap: 10px; flex-wrap: wrap; margin-bottom: 16px; }
+.trash-stat-chip { display: flex; align-items: center; gap: 8px; background: var(--bg2); border: 1px solid var(--border); border-radius: 999px; padding: 6px 14px 6px 8px; font-size: 12.5px; animation: card-in .35s both; }
+.trash-stat-chip .chip-icon { width: 26px; height: 26px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 13px; background: var(--bg3); }
+.trash-stat-chip .chip-count { font-weight: 700; color: var(--text); }
+.trash-stat-chip .chip-label { color: var(--text3); }
+
+.trash-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+
+.trash-card { position: relative; background: var(--bg2); border: 1px solid var(--border); border-radius: var(--radius); padding: 16px; display: flex; flex-direction: column; gap: 10px; animation: card-in .4s both; transition: border-color .2s, transform .2s, box-shadow .2s, opacity .25s, max-height .3s; overflow: hidden; border-left: 3px solid var(--border2); }
+.trash-card:hover { border-color: var(--border2); transform: translateY(-2px); box-shadow: var(--shadow); }
+.trash-card.type-product  { border-left-color: var(--teal); }
+.trash-card.type-category { border-left-color: var(--blue); }
+.trash-card.type-expense  { border-left-color: var(--amber); }
+.trash-card.card-out { opacity: 0; transform: scale(.92); max-height: 0; padding-top: 0; padding-bottom: 0; margin: 0; border-width: 0; pointer-events: none; }
+.trash-card.card-busy { opacity: .55; pointer-events: none; }
+
+.trash-card-top { display: flex; align-items: flex-start; gap: 10px; }
+.trash-card-icon { width: 38px; height: 38px; flex-shrink: 0; border-radius: 10px; display: flex; align-items: center; justify-content: center; font-size: 18px; background: var(--bg3); }
+.trash-card.type-product  .trash-card-icon { background: rgba(20,184,166,.15); }
+.trash-card.type-category .trash-card-icon { background: rgba(59,130,246,.15); }
+.trash-card.type-expense  .trash-card-icon { background: rgba(245,166,35,.15); }
+.trash-card-title { font-weight: 700; font-size: 14.5px; color: var(--text); line-height: 1.25; word-break: break-word; }
+.trash-card-subtitle { font-size: 12px; color: var(--text3); margin-top: 2px; word-break: break-word; }
+
+.trash-card-meta { display: flex; flex-wrap: wrap; gap: 6px; }
+.trash-card-meta-item { font-size: 11.5px; color: var(--text2); background: var(--bg3); border-radius: 6px; padding: 3px 8px; }
+
+.trash-card-footer { display: flex; align-items: center; justify-content: space-between; gap: 8px; padding-top: 8px; border-top: 1px solid var(--border); margin-top: auto; }
+.trash-card-deleted-info { font-size: 11px; color: var(--text3); line-height: 1.4; }
+.trash-card-deleted-info b { color: var(--text2); font-weight: 600; }
+.trash-card-actions { display: flex; gap: 6px; flex-shrink: 0; }
+.trash-card-actions .btn-icon { width: 32px; height: 32px; padding: 0; border-radius: 8px; }
+
+@media (max-width: 480px) {
+  .trash-grid { grid-template-columns: 1fr; }
+  .trash-card-footer { flex-direction: column; align-items: stretch; gap: 10px; }
+  .trash-card-actions { justify-content: flex-end; }
+}
