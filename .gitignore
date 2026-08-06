@@ -2,12 +2,12 @@
 # Never track the live SQLite database (and its WAL/SHM sidecar files from
 # PRAGMA journal_mode=WAL) so a force-push or history rewrite can never
 # touch, overwrite, or roll back the real data sitting on the server.
-*.db
+#*.db
 *.db-wal
 *.db-shm
-*.sqlite
-*.sqlite3
-backend/motoshop.db
+#*.sqlite
+#*.sqlite3
+#backend/motoshop.db
 backend/instance/
 
 # Backups produced by the app's own backup/export feature
