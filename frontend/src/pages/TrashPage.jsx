@@ -56,7 +56,8 @@ export default function TrashPage() {
       setItems(data)
     } catch { toast(T('trash_load_failed'), 'error') }
     finally { setLoading(false) }
-  }, [T])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => { load() }, [load])
   useEffect(() => onSSE(evt => { if (SSE_TYPES.has(evt.type)) load() }), [load, onSSE])
