@@ -90,6 +90,17 @@ h1,h2,h3,h4,h5,h6 { font-family: var(--font-head); font-weight: 700; }
 
 /* Layout */
 .app-shell { display: flex; height: 100vh; overflow: hidden; }
+/* Progressive enhancement: 100vh is the layout viewport, which on many
+   mobile browsers stays sized for the address bar hidden state even
+   while it's showing (or vice versa on scroll), letting the fixed
+   bottom nav drift a few px off the true visible edge mid-scroll.
+   100dvh tracks the actual visible viewport as it changes, so browsers
+   that support it (all current major mobile browsers) get a nav bar
+   that stays glued to the real bottom edge at every scroll position;
+   older browsers silently keep the 100vh above. */
+@supports (height: 100dvh) {
+  .app-shell { height: 100dvh; }
+}
 .sidebar { width: var(--sidebar-w); background: var(--bg2); border-right: 1px solid var(--border); display: flex; flex-direction: column; flex-shrink: 0; overflow-y: auto; overflow-x: hidden; transition: transform .3s cubic-bezier(.4,0,.2,1); z-index: 100; }
 .main-area { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
 .topbar { height: var(--topbar-h); background: var(--bg2); border-bottom: 1px solid var(--border); display: flex; align-items: center; padding: 0 20px; gap: 12px; flex-shrink: 0; }
@@ -298,6 +309,11 @@ td.center, th.center { text-align: center; }
 
 /* Responsive */
 @media (max-width: 900px) {
+  /* --mobile-nav-h: initial best-guess fallback for the instant before
+     React mounts and Shell.jsx measures the real nav element and
+     overwrites this with the actual rendered height — see the
+     ResizeObserver in Shell.jsx. Keeps first paint from flashing
+     content under the bar; everything after that uses the true value. */
   :root { --sidebar-w: 0px; --mobile-nav-h: calc(52px + env(safe-area-inset-bottom)); }
   .sidebar { position: fixed; left: 0; top: 0; bottom: 0; width: 260px; transform: translateX(-100%); }
   .sidebar.open { transform: translateX(0); box-shadow: 4px 0 32px var(--overlay-soft); }

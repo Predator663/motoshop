@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef, useLayoutEffect } from 'react'
 import { useApp } from '../context/AppContext'
 import { useT } from '../hooks/useT'
 import Sidebar from './Sidebar'
@@ -20,6 +20,36 @@ export default function Shell() {
           canInstall, installed, promptInstall, updateAvailable, applyUpdate, systemStatus } = useApp()
   const T = useT()
   const [sidebarOpen, setSidebarOpen] = useState(false)
+
+  // FIX (mobile bottom-nav overlap): every consumer of the nav's height
+  // (.scroll-page/.page-content bottom padding, the modal overlay, the
+  // toast stack, the open POS cart drawer) reads the CSS var
+  // --mobile-nav-h. It used to be a hardcoded guess (52px + safe-area),
+  // which is only right for one font size on one platform's emoji
+  // renderer — bump the OS text-size setting, or render on a device
+  // where the nav icons/labels lay out a few px taller, and that guess
+  // falls short, so the real bottom of the page sits under the bar.
+  // Fix: measure the actual rendered nav element and keep the CSS var
+  // in sync with reality on every device, at every font size, forever —
+  // no more guessing. ResizeObserver re-fires on font load, OS text-size
+  // changes, orientation changes, and role-based item-count changes, so
+  // this stays correct without any dependency array.
+  const mobileNavRef = useRef(null)
+  useLayoutEffect(() => {
+    const el = mobileNavRef.current
+    if (!el || typeof ResizeObserver === 'undefined') return
+    const applyHeight = () => {
+      // getBoundingClientRect (not contentRect) so padding — including the
+      // env(safe-area-inset-bottom) baked into the nav's own CSS — is
+      // already included in one real, measured number.
+      const h = el.getBoundingClientRect().height
+      if (h > 0) document.documentElement.style.setProperty('--mobile-nav-h', `${h}px`)
+    }
+    applyHeight()
+    const observer = new ResizeObserver(applyHeight)
+    observer.observe(el)
+    return () => observer.disconnect()
+  }, [])
 
   // FIX (superuser control): a module can be switched off site-wide from
   // the Superuser panel (feature_flags). Absent/true = enabled; explicit
@@ -168,7 +198,7 @@ export default function Shell() {
         </footer>
       </div>
 
-      <div className="mobile-nav">
+      <div className="mobile-nav" ref={mobileNavRef}>
         <div className="mobile-nav-items">
           {mobileItems.map(it => (
             <div key={it.key} className={`mobile-nav-item ${activeTab === it.key ? 'active' : ''}`} onClick={() => setActiveTab(it.key)}>
