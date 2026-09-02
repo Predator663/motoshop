@@ -3,6 +3,8 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useApp } from '../context/AppContext'
 import { useT } from '../hooks/useT'
 import { api, formatMoney, formatTime } from '../utils/api'
+import Pagination from '../components/Pagination'
+import { usePagination } from '../hooks/usePagination'
 
 export default function StockPage() {
   const { currency, onSSE, toast, auth } = useApp()
@@ -72,6 +74,9 @@ export default function StockPage() {
     })
 
   const summary = data?.summary || {}
+  // Note: resetKey deliberately excludes `data` — this page auto-refreshes
+  // every 15s and jumping back to page 1 on every poll would be jarring.
+  const pag = usePagination(filtered, { pageSize: 12, resetKey: search + filterStatus + sortBy })
 
   return (
     <div>
@@ -179,7 +184,7 @@ export default function StockPage() {
                   <th className="center">{T('stock_col_status')}</th>
                 </tr>
               </thead>
-              <tbody>
+              <tbody key={pag.page} className="pagination-page-in">
                 {filtered.length === 0 ? (
                   <tr>
                     <td colSpan={9} style={{textAlign:'center',padding:40,color:'var(--text3)'}}>
@@ -189,7 +194,7 @@ export default function StockPage() {
                       </div>
                     </td>
                   </tr>
-                ) : filtered.map(p => (
+                ) : pag.paged.map(p => (
                   <StockRow key={p.id} product={p} currency={currency} isOwner={isOwner} />
                 ))}
               </tbody>
@@ -199,8 +204,8 @@ export default function StockPage() {
       </div>
 
       {!loading && filtered.length > 0 && (
-        <div style={{marginTop:12,fontSize:12,color:'var(--text3)',textAlign:'right'}}>
-          {T('stock_showing')} {filtered.length} {T('stock_of')} {products.length}
+        <div style={{padding:'0 4px'}}>
+          <Pagination page={pag.page} totalPages={pag.totalPages} total={pag.total} pageSize={pag.pageSize} onChange={pag.setPage} />
         </div>
       )}
     </div>

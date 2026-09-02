@@ -4,6 +4,8 @@ import { useApp } from '../context/AppContext'
 import { useT } from '../hooks/useT'
 import { api, formatMoney, today, monthStart } from '../utils/api'
 import Modal from '../components/Modal'
+import Pagination from '../components/Pagination'
+import { usePagination } from '../hooks/usePagination'
 
 const CATEGORIES = ['Rent','Electricity','Salaries','Transport','Fuel','Maintenance','Cleaning','Security','Internet','Stationery','Other']
 
@@ -28,6 +30,8 @@ export default function ExpensesPage() {
 
   useEffect(() => { load() }, [load])
   useEffect(() => onSSE(evt => { if (evt.type === 'expense_created') load() }), [load, onSSE])
+
+  const pag = usePagination(expenses, { pageSize: 10, resetKey: filters.from + filters.to + filters.category })
 
   async function save(form) {
     setSaving(true)
@@ -128,12 +132,12 @@ export default function ExpensesPage() {
                 <th className="center">Actions</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody key={pag.page} className="pagination-page-in">
               {loading ? (
                 [...Array(6)].map((_,i) => <tr key={i}>{[...Array(6)].map((_,j) => <td key={j}><div className="skeleton" style={{height:14,width:'75%',borderRadius:4}} /></td>)}</tr>)
               ) : expenses.length === 0 ? (
                 <tr><td colSpan={6} style={{textAlign:'center',padding:48,color:'var(--text3)'}}>No expenses in this period</td></tr>
-              ) : expenses.map(e => (
+              ) : pag.paged.map(e => (
                 <tr key={e.id}>
                   <td style={{fontSize:12,color:'var(--text2)'}}>{e.expense_date}</td>
                   <td><span className="badge badge-amber">{e.category}</span></td>
@@ -154,6 +158,11 @@ export default function ExpensesPage() {
             </tbody>
           </table>
         </div>
+        {!loading && expenses.length>0 && (
+          <div style={{padding:'0 16px 12px'}}>
+            <Pagination page={pag.page} totalPages={pag.totalPages} total={pag.total} pageSize={pag.pageSize} onChange={pag.setPage} />
+          </div>
+        )}
       </div>
 
       {modal && (

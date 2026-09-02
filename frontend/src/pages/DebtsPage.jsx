@@ -3,6 +3,8 @@ import { useApp } from '../context/AppContext'
 import { useT } from '../hooks/useT'
 import { api, formatMoney, formatDate } from '../utils/api'
 import Modal from '../components/Modal'
+import Pagination from '../components/Pagination'
+import { usePagination } from '../hooks/usePagination'
 
 export default function DebtsPage() {
   const { currency, toast, onSSE } = useApp()
@@ -54,6 +56,7 @@ export default function DebtsPage() {
     finally { setSaving(false) }
   }
 
+  const pag = usePagination(debts, { pageSize: 10, resetKey: statusFilter + customerSearch })
   const totalOutstanding = debts.filter(d=>['unpaid','partial'].includes(d.status)).reduce((s,d)=>s+d.remaining,0)
   const agingColor = (days) => days<=30?'var(--green)':days<=60?'var(--amber)':days<=90?'var(--accent)':'var(--red)'
 
@@ -100,12 +103,12 @@ export default function DebtsPage() {
                 <th className="center">{T('debts_col_action')}</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody key={pag.page} className="pagination-page-in">
               {loading ? (
                 [...Array(6)].map((_,i)=><tr key={i}>{[...Array(10)].map((_,j)=><td key={j}><div className="skeleton" style={{height:14,width:'75%',borderRadius:4}} /></td>)}</tr>)
               ) : debts.length===0 ? (
                 <tr><td colSpan={10} style={{textAlign:'center',padding:48,color:'var(--text3)'}}>{T('debts_empty')}</td></tr>
-              ) : debts.map(d=>(
+              ) : pag.paged.map(d=>(
                 <tr key={d.id}>
                   <td style={{fontWeight:600}}>{d.customer_name}</td>
                   <td style={{fontSize:12,color:'var(--text2)'}}>{d.customer_phone||'—'}</td>
@@ -122,6 +125,11 @@ export default function DebtsPage() {
             </tbody>
           </table>
         </div>
+        {!loading && debts.length>0 && (
+          <div style={{padding:'0 16px 12px'}}>
+            <Pagination page={pag.page} totalPages={pag.totalPages} total={pag.total} pageSize={pag.pageSize} onChange={pag.setPage} />
+          </div>
+        )}
       </div>
 
       {payModal && <PayDebtModal debt={payModal} currency={currency} saving={saving} T={T} onPay={(form)=>payDebt(payModal.id,form)} onClose={()=>setPayModal(null)} />}

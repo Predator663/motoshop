@@ -247,6 +247,8 @@ export const translations = {
     trash_cancel:'Cancel', trash_confirm_delete_forever:'Yes, delete forever',
     trash_count_one:'{n} item', trash_count_other:'{n} items',
     trash_load_failed:'Failed to load Trash',
+    pagination_of:'of', pagination_showing:'Showing', pagination_prev:'Previous page',
+    pagination_next:'Next page', pagination_page:'Page', pagination_no_results:'No results',
   },
 
   sw: {
@@ -501,5 +503,7 @@ export const translations = {
     trash_cancel:'Ghairi', trash_confirm_delete_forever:'Ndiyo, futa kabisa',
     trash_count_one:'kipengele {n}', trash_count_other:'vipengele {n}',
     trash_load_failed:'Imeshindwa kupakia Takataka',
+    pagination_of:'kati ya', pagination_showing:'Inaonyesha', pagination_prev:'Ukurasa uliopita',
+    pagination_next:'Ukurasa unaofuata', pagination_page:'Ukurasa', pagination_no_results:'Hakuna matokeo',
   }
 }

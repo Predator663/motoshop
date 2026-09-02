@@ -527,3 +527,50 @@ td.center, th.center { text-align: center; }
   .trash-card-footer { flex-direction: column; align-items: stretch; gap: 10px; }
   .trash-card-actions { justify-content: flex-end; }
 }
+
+/* ── Pagination — smooth animated page control (used on every list page) ──
+   The active-page pill slides via a single absolutely-positioned indicator
+   whose transform is updated in JS (measured from the active button's
+   offsetLeft/offsetWidth), so it glides between numbers instead of jumping.
+   Page content itself replays a soft fade/slide via `.pagination-page-in`
+   (apply with a `key={page}` wrapper so React remounts it on page change). */
+.pagination-bar {
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  flex-wrap: wrap; padding: 14px 4px 4px;
+}
+.pagination-info { font-size: 12.5px; color: var(--text3); }
+.pagination-info strong { color: var(--text2); font-weight: 700; }
+
+.pagination {
+  position: relative; display: inline-flex; align-items: center; gap: 2px;
+  background: var(--bg3); border: 1px solid var(--border); border-radius: 999px;
+  padding: 4px; isolation: isolate;
+}
+.pagination-indicator {
+  position: absolute; top: 4px; left: 0; bottom: 4px; z-index: 0;
+  background: var(--accent); border-radius: 999px;
+  transition: transform .28s cubic-bezier(.4,0,.2,1), width .28s cubic-bezier(.4,0,.2,1), opacity .2s;
+  box-shadow: 0 2px 10px rgba(232,80,10,.35);
+}
+.pagination-num, .pagination-arrow {
+  position: relative; z-index: 1; border: none; background: transparent; cursor: pointer;
+  min-width: 32px; height: 32px; padding: 0 4px; border-radius: 999px;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 600; color: var(--text2); font-family: var(--font-body);
+  transition: color .2s, background .2s, transform .15s;
+}
+.pagination-num:hover:not(.active) { color: var(--text); background: var(--bg4); }
+.pagination-num:active, .pagination-arrow:active:not(:disabled) { transform: scale(.9); }
+.pagination-num.active { color: var(--on-accent); }
+.pagination-arrow { color: var(--text2); }
+.pagination-arrow:hover:not(:disabled) { color: var(--text); background: var(--bg4); }
+.pagination-arrow:disabled { opacity: .35; cursor: not-allowed; }
+.pagination-dots { position: relative; z-index: 1; min-width: 20px; text-align: center; color: var(--text3); font-size: 13px; user-select: none; }
+
+@keyframes page-swap { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: translateY(0); } }
+.pagination-page-in { animation: page-swap .22s cubic-bezier(.4,0,.2,1) both; }
+
+@media (max-width: 640px) {
+  .pagination-bar { justify-content: center; text-align: center; }
+  .pagination-info { order: 2; width: 100%; }
+}

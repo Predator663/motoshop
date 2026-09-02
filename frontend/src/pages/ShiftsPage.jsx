@@ -4,6 +4,8 @@ import { useT } from '../hooks/useT'
 import { api, formatMoney, formatDateTime } from '../utils/api'
 import { parseServerDate } from '../utils/datetime'
 import Modal from '../components/Modal'
+import Pagination from '../components/Pagination'
+import { usePagination } from '../hooks/usePagination'
 
 export default function ShiftsPage() {
   const { auth, currency, toast, onSSE } = useApp()
@@ -31,6 +33,8 @@ export default function ShiftsPage() {
 
   useEffect(() => { load() }, [load])
   useEffect(() => onSSE(evt => { if (['shift_opened','shift_closed'].includes(evt.type)) load() }), [load, onSSE])
+
+  const pag = usePagination(history, { pageSize: 10 })
 
   async function openShift() {
     setSaving(true)
@@ -114,12 +118,12 @@ export default function ShiftsPage() {
                     <th className="center">{T('shifts_col_status')}</th>
                   </tr>
                 </thead>
-                <tbody>
+                <tbody key={pag.page} className="pagination-page-in">
                   {loading ? (
                     [...Array(4)].map((_,i) => <tr key={i}>{[...Array(8)].map((_,j) => <td key={j}><div className="skeleton" style={{height:14,width:'75%',borderRadius:4}} /></td>)}</tr>)
                   ) : history.length === 0 ? (
                     <tr><td colSpan={8} style={{textAlign:'center',padding:32,color:'var(--text3)'}}>{T('shifts_empty')}</td></tr>
-                  ) : history.map(s => (
+                  ) : pag.paged.map(s => (
                     <tr key={s.id}>
                       <td style={{fontWeight:600}}>{s.cashier_name}</td>
                       <td style={{fontSize:12,color:'var(--text2)'}}>{formatDateTime(s.opened_at)}</td>
@@ -138,6 +142,11 @@ export default function ShiftsPage() {
                 </tbody>
               </table>
             </div>
+            {!loading && history.length>0 && (
+              <div style={{padding:'0 16px 12px'}}>
+                <Pagination page={pag.page} totalPages={pag.totalPages} total={pag.total} pageSize={pag.pageSize} onChange={pag.setPage} />
+              </div>
+            )}
           </div>
         </div>
       )}

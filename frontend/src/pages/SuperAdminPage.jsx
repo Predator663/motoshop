@@ -1,6 +1,8 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useApp } from '../context/AppContext'
 import { api, formatDateTime } from '../utils/api'
+import Pagination from '../components/Pagination'
+import { usePagination } from '../hooks/usePagination'
 
 const ALL_MODULES = [
   { key: 'dashboard', label: 'Dashibodi' },
@@ -303,7 +305,7 @@ function DataBrowserPanel({ toast }) {
                 <th style={{ padding: '8px 10px' }} />
               </tr>
             </thead>
-            <tbody>
+            <tbody key={page} className="pagination-page-in">
               {rows.map((r, i) => (
                 <tr key={i} style={{ borderBottom: '1px solid #16202f' }}>
                   {displayCols.map(c => (
@@ -326,11 +328,7 @@ function DataBrowserPanel({ toast }) {
       )}
 
       {!loading && table && total > limit && (
-        <div style={{ display: 'flex', gap: 8, alignItems: 'center', justifyContent: 'center' }}>
-          <button className="btn btn-secondary btn-sm" disabled={page <= 1} onClick={() => setPage(p => p - 1)}>← Nyuma</button>
-          <span style={{ fontSize: 12, color: '#94a3b8' }}>Ukurasa {page} / {Math.ceil(total / limit)}</span>
-          <button className="btn btn-secondary btn-sm" disabled={page >= Math.ceil(total / limit)} onClick={() => setPage(p => p + 1)}>Mbele →</button>
-        </div>
+        <Pagination page={page} totalPages={Math.ceil(total / limit)} total={total} pageSize={limit} onChange={setPage} />
       )}
 
       {editRow !== null && (
@@ -587,6 +585,8 @@ function BackupsPanel({ toast }) {
     finally { setUploading(false) }
   }
 
+  const pag = usePagination(backups, { pageSize: 8 })
+
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
       <div className="card" style={{ background: '#0f1923', border: '1px solid #1e293b', display: 'flex', justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 10 }}>
@@ -608,7 +608,8 @@ function BackupsPanel({ toast }) {
       {loading ? <div className="spinner" /> : (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
           {backups.length === 0 && <div style={{ color: '#64748b', fontSize: 13, textAlign: 'center', padding: 20 }}>Hakuna backup bado.</div>}
-          {backups.map(b => (
+          <div key={pag.page} className="pagination-page-in" style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+          {pag.paged.map(b => (
             <div key={b.filename} className="card" style={{
               background: '#0f1923', border: '1px solid #1e293b', display: 'flex',
               justifyContent: 'space-between', alignItems: 'center', flexWrap: 'wrap', gap: 8,
@@ -631,6 +632,10 @@ function BackupsPanel({ toast }) {
               </div>
             </div>
           ))}
+          </div>
+          {!loading && backups.length > 0 && (
+            <Pagination page={pag.page} totalPages={pag.totalPages} total={pag.total} pageSize={pag.pageSize} onChange={pag.setPage} />
+          )}
         </div>
       )}
     </div>

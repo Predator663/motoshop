@@ -4,6 +4,8 @@ import { useApp } from '../context/AppContext'
 import { useT } from '../hooks/useT'
 import { api, formatMoney, formatDateTime, getCachedProducts, setCachedProducts } from '../utils/api'
 import Modal from '../components/Modal'
+import Pagination from '../components/Pagination'
+import { usePagination } from '../hooks/usePagination'
 
 const UNITS = ['Piece','Liter','Meter','Kg','Box','Set','Pair']
 
@@ -51,6 +53,7 @@ export default function ProductsPage() {
     const s = search.toLowerCase()
     return p.name.toLowerCase().includes(s) || p.sku.toLowerCase().includes(s)
   })
+  const pag = usePagination(filtered, { pageSize: 10, resetKey: search + catFilter + showInactive })
 
   async function saveProduct(form) {
     setSaving(true)
@@ -186,14 +189,14 @@ export default function ProductsPage() {
                 {isOwner && <th className="center">{T('products_col_actions')}</th>}
               </tr>
             </thead>
-            <tbody>
+            <tbody key={pag.page} className="pagination-page-in">
               {loading ? (
                 [...Array(10)].map((_,i) => (
                   <tr key={i}>{[...Array(isOwner?8:6)].map((_,j) => <td key={j}><div className="skeleton" style={{height:14,width:'75%',borderRadius:4}} /></td>)}</tr>
                 ))
               ) : filtered.length === 0 ? (
                 <tr><td colSpan={8} style={{textAlign:'center',padding:48,color:'var(--text3)'}}>{T('products_empty')}</td></tr>
-              ) : filtered.map(p => (
+              ) : pag.paged.map(p => (
                 <tr key={p.id}>
                   <td>
                     <div style={{fontWeight:600}}>{p.name}</div>
@@ -225,6 +228,11 @@ export default function ProductsPage() {
             </tbody>
           </table>
         </div>
+        {!loading && filtered.length>0 && (
+          <div style={{padding:'0 16px 12px'}}>
+            <Pagination page={pag.page} totalPages={pag.totalPages} total={pag.total} pageSize={pag.pageSize} onChange={pag.setPage} />
+          </div>
+        )}
       </div>
 
       {/* Edit/Create Modal */}

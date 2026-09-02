@@ -5,6 +5,8 @@ import { useT } from '../hooks/useT'
 import { api, formatMoney } from '../utils/api'
 import { parseServerDate, formatDateTime } from '../utils/datetime'
 import Modal from '../components/Modal'
+import Pagination from '../components/Pagination'
+import { usePagination } from '../hooks/usePagination'
 
 const TYPE_ICON = { product: '📦', category: '🏷️', expense: '💸' }
 const SSE_TYPES = new Set([
@@ -138,6 +140,8 @@ export default function TrashPage() {
     return sorted
   }, [items, typeFilter, search, sortBy])
 
+  const pag = usePagination(filtered, { pageSize: 12, resetKey: typeFilter + search + sortBy })
+
   function metaPills(it) {
     if (it.entity_type === 'product') {
       return [
@@ -238,8 +242,8 @@ export default function TrashPage() {
           <div>{items.length === 0 ? T('trash_empty_state_sub') : 'No items match your search/filter.'}</div>
         </div>
       ) : (
-        <div className="trash-grid">
-          {filtered.map((it, i) => {
+        <div className="trash-grid pagination-page-in" key={pag.page}>
+          {pag.paged.map((it, i) => {
             const k = key(it)
             const busy = busyKeys.has(k)
             const out = outKeys.has(k)
@@ -292,6 +296,10 @@ export default function TrashPage() {
             )
           })}
         </div>
+      )}
+
+      {!loading && filtered.length > 0 && (
+        <Pagination page={pag.page} totalPages={pag.totalPages} total={pag.total} pageSize={pag.pageSize} onChange={pag.setPage} />
       )}
 
       {confirmDelete && (

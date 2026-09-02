@@ -3,6 +3,8 @@ import { useState, useCallback } from 'react'
 import { useApp } from '../context/AppContext'
 import { useT } from '../hooks/useT'
 import { api, formatMoney, formatDateTime, today, monthStart } from '../utils/api'
+import Pagination from '../components/Pagination'
+import { usePagination } from '../hooks/usePagination'
 
 const TAB_KEYS = [
   { key:'pl',    icon:'📊' },
@@ -178,6 +180,7 @@ function PLReport({ data, currency }) {
 
 // ── Stock valuation ───────────────────────────────────────────────────────
 function StockReport({ data, currency }) {
+  const pag = usePagination(data.items, { pageSize: 15 })
   return (
     <div>
       <div className="report-header">
@@ -209,8 +212,8 @@ function StockReport({ data, currency }) {
                 <th className="right">Potential Profit</th>
               </tr>
             </thead>
-            <tbody>
-              {data.items.map((item, i) => (
+            <tbody key={pag.page} className="pagination-page-in">
+              {pag.paged.map((item, i) => (
                 <tr key={i} style={{background: i%2===0?'var(--bg2)':'var(--bg3)'}}>
                   <td style={{fontWeight:600}}>{item.name}</td>
                   <td style={{fontFamily:'monospace',fontSize:12,color:'var(--teal)'}}>{item.sku}</td>
@@ -236,6 +239,7 @@ function StockReport({ data, currency }) {
             </tfoot>
           </table>
         </div>
+        <Pagination page={pag.page} totalPages={pag.totalPages} total={pag.total} pageSize={pag.pageSize} onChange={pag.setPage} />
       </div>
     </div>
   )
@@ -244,6 +248,7 @@ function StockReport({ data, currency }) {
 // ── Sales statement ───────────────────────────────────────────────────────
 function SalesReport({ data, currency }) {
   const T = useT()
+  const pag = usePagination(data.sales, { pageSize: 15 })
   return (
     <div>
       <div className="report-header">
@@ -273,8 +278,8 @@ function SalesReport({ data, currency }) {
                 <th className="right">Total</th>
               </tr>
             </thead>
-            <tbody>
-              {data.sales.map((s, i) => (
+            <tbody key={pag.page} className="pagination-page-in">
+              {pag.paged.map((s, i) => (
                 <tr key={i} style={{background: i%2===0?'var(--bg2)':'var(--bg3)'}}>
                   <td style={{fontFamily:'monospace',fontSize:12,color:'var(--teal)'}}>{s.receipt_no}</td>
                   <td style={{fontSize:12,color:'var(--text2)'}}>{formatDateTime(s.created_at)}</td>
@@ -292,6 +297,7 @@ function SalesReport({ data, currency }) {
             </tfoot>
           </table>
         </div>
+        <Pagination page={pag.page} totalPages={pag.totalPages} total={pag.total} pageSize={pag.pageSize} onChange={pag.setPage} />
       </div>
     </div>
   )
@@ -324,28 +330,7 @@ function AgingReport({ data, currency }) {
 
       {buckets.map(b => (
         (data[b.key] || []).length > 0 && (
-          <div key={b.key} className="report-section" style={{marginBottom:12}}>
-            <div className="report-section-header" style={{background:b.color+'22',color:b.color,borderBottom:`1px solid ${b.color}44`}}>
-              {b.label} — {formatMoney((data[b.key]||[]).reduce((t,r)=>t+r.remaining,0), currency)}
-            </div>
-            <div className="table-wrap">
-              <table>
-                <thead>
-                  <tr><th>Customer</th><th>Phone</th><th>Days</th><th className="right">Remaining</th></tr>
-                </thead>
-                <tbody>
-                  {data[b.key].map((r,i) => (
-                    <tr key={i} style={{background:i%2===0?'var(--bg2)':'var(--bg3)'}}>
-                      <td style={{fontWeight:600}}>{r.customer_name}</td>
-                      <td style={{fontSize:12,color:'var(--text2)'}}>{r.customer_phone||'—'}</td>
-                      <td><span style={{color:b.color,fontWeight:700}}>{r.days_overdue}d</span></td>
-                      <td className="right font-bold" style={{color:b.color}}>{formatMoney(r.remaining, currency)}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
+          <AgingBucketTable key={b.key} bucketKey={b.key} label={b.label} color={b.color} rows={data[b.key]} currency={currency} />
         )
       ))}
 
@@ -355,6 +340,35 @@ function AgingReport({ data, currency }) {
           <div className="empty-title">No outstanding debts!</div>
         </div>
       )}
+    </div>
+  )
+}
+
+function AgingBucketTable({ label, color, rows, currency }) {
+  const pag = usePagination(rows, { pageSize: 10 })
+  return (
+    <div className="report-section" style={{marginBottom:12}}>
+      <div className="report-section-header" style={{background:color+'22',color,borderBottom:`1px solid ${color}44`}}>
+        {label} — {formatMoney(rows.reduce((t,r)=>t+r.remaining,0), currency)}
+      </div>
+      <div className="table-wrap">
+        <table>
+          <thead>
+            <tr><th>Customer</th><th>Phone</th><th>Days</th><th className="right">Remaining</th></tr>
+          </thead>
+          <tbody key={pag.page} className="pagination-page-in">
+            {pag.paged.map((r,i) => (
+              <tr key={i} style={{background:i%2===0?'var(--bg2)':'var(--bg3)'}}>
+                <td style={{fontWeight:600}}>{r.customer_name}</td>
+                <td style={{fontSize:12,color:'var(--text2)'}}>{r.customer_phone||'—'}</td>
+                <td><span style={{color,fontWeight:700}}>{r.days_overdue}d</span></td>
+                <td className="right font-bold" style={{color}}>{formatMoney(r.remaining, currency)}</td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <Pagination page={pag.page} totalPages={pag.totalPages} total={pag.total} pageSize={pag.pageSize} onChange={pag.setPage} />
     </div>
   )
 }

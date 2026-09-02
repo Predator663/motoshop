@@ -4,6 +4,8 @@ import { useApp } from '../context/AppContext'
 import { useT } from '../hooks/useT'
 import { api, formatMoney, formatDateTime, today } from '../utils/api'
 import Modal from '../components/Modal'
+import Pagination from '../components/Pagination'
+import { usePagination } from '../hooks/usePagination'
 
 export default function SalesHistory() {
   const { auth, currency, toast, onSSE } = useApp()
@@ -33,6 +35,8 @@ export default function SalesHistory() {
   useEffect(() => onSSE(evt => {
     if (['sale_created','sale_cancelled'].includes(evt.type)) load()
   }), [load, onSSE])
+
+  const pag = usePagination(sales, { pageSize: 10, resetKey: filters.from + filters.to + filters.method + filters.customer })
 
   async function openDetail(id) {
     setDetailLoading(true)
@@ -124,7 +128,7 @@ export default function SalesHistory() {
                 <th className="center">{T('sales_col_action')}</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody key={pag.page} className="pagination-page-in">
               {loading ? (
                 [...Array(8)].map((_,i) => (
                   <tr key={i}>
@@ -135,7 +139,7 @@ export default function SalesHistory() {
                 ))
               ) : sales.length === 0 ? (
                 <tr><td colSpan={auth?.role === 'owner' ? 9 : 8} style={{textAlign:'center',padding:40,color:'var(--text3)'}}>Hakuna mauzo yaliyopatikana</td></tr>
-              ) : sales.map(s => (
+              ) : pag.paged.map(s => (
                 <SaleRow
                   key={s.id}
                   sale={s}
@@ -147,6 +151,11 @@ export default function SalesHistory() {
             </tbody>
           </table>
         </div>
+        {!loading && sales.length>0 && (
+          <div style={{padding:'0 16px 12px'}}>
+            <Pagination page={pag.page} totalPages={pag.totalPages} total={pag.total} pageSize={pag.pageSize} onChange={pag.setPage} />
+          </div>
+        )}
       </div>
 
       {/* Detail modal */}
