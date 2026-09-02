@@ -6,8 +6,8 @@
 // offline navigation fallback so a hard refresh while offline still loads
 // the app shell instead of the browser's own error page.
 
-const SHELL_CACHE = 'motoshop-shell-v3'
-const API_CACHE = 'motoshop-api-v3'
+const SHELL_CACHE = 'motoshop-shell-v4'
+const API_CACHE = 'motoshop-api-v4'
 const STATIC_ASSETS = ['/', '/index.html', '/api/manifest.webmanifest']
 
 self.addEventListener('install', evt => {

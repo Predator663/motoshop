@@ -2272,9 +2272,26 @@ def sse():
 def serve_frontend(path):
     if path.startswith('api/'):
         return jsonify({'error': 'Not found'}), 404
+    # FIX (stuck-on-splash after deploy): send_from_directory previously set
+    # no explicit Cache-Control, so browsers/CDNs/proxies were free to
+    # heuristically cache index.html and sw.js for a long time. After a
+    # new deploy, a stale cached index.html/sw.js kept pointing at the
+    # *previous* build's content-hashed JS/CSS filenames -- filenames that
+    # no longer exist once the new dist/ output replaces the old one -- so
+    # the browser 404'd fetching the app bundle and never got past the
+    # splash screen. index.html and sw.js must always be revalidated on
+    # every request; the hashed /assets/* files are safe to cache forever
+    # since a new build always gives them a new filename.
     if path and os.path.exists(os.path.join(FRONTEND_DIST, path)):
-        return send_from_directory(FRONTEND_DIST, path)
-    return send_from_directory(FRONTEND_DIST, 'index.html')
+        resp = send_from_directory(FRONTEND_DIST, path)
+        if path == 'sw.js' or path.endswith('.html'):
+            resp.headers['Cache-Control'] = 'no-cache'
+        elif path.startswith('assets/'):
+            resp.headers['Cache-Control'] = 'public, max-age=31536000, immutable'
+        return resp
+    resp = send_from_directory(FRONTEND_DIST, 'index.html')
+    resp.headers['Cache-Control'] = 'no-cache'
+    return resp
 
 # Health
 @app.route('/api/health')
